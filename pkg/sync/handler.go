@@ -1,7 +1,9 @@
 package sync
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/bank-vaults/secret-sync/pkg/apis"
 	"github.com/sirupsen/logrus"
@@ -11,6 +13,8 @@ import (
 )
 
 type Handler interface {
+	Set(config apis.SyncSecretStoreSpec) error
+	Validate(config apis.SyncSecretStoreSpec) error
 	Stop()
 	Wait()
 }
@@ -20,77 +24,31 @@ type handler struct {
 	stopped bool
 	stopCh  chan struct{}
 	doneCh  chan struct{}
+
+	options apis.SyncSecretStoreSpec
+	source  apis.StoreReader
+	dest    apis.StoreWriter
 }
 
 // HandleSync will start synchronization from source to dest based on provided options.
 // Returns Manager which can be used to manage synchronization or an error.
 func HandleSync(req apis.SyncSecretStoreSpec) (Handler, error) {
-	// Validate request
-	if req.SourceStore == nil {
-		return nil, fmt.Errorf("cannot sync for nil store source")
+	// Create handler
+	h := &handler{
+		mu:      sync.Mutex{},
+		stopped: false,
+		stopCh:  make(chan struct{}, 1),
+		doneCh:  make(chan struct{}, 1),
 	}
-	if req.DestStore == nil {
-		return nil, fmt.Errorf("cannot sync for nil store destination")
+	if err := h.Set(req); err != nil {
+		return nil, fmt.Errorf("could not set config: %w", err)
 	}
-	if len(req.KeyFilters) == 0 && len(req.Keys) == 0 {
-		return nil, fmt.Errorf("both keys and list key filters are empty, cannot sync")
-	}
-
-	// Validate permissions
-	if !req.SourceStore.GetPermissions().CanPerform(apis.SecretStoreRead) {
-		return nil, fmt.Errorf("source store does not have read permissions")
-	}
-	if !req.DestStore.GetPermissions().CanPerform(apis.SecretStoreWrite) {
-		return nil, fmt.Errorf("destination store does not have write permissions")
-	}
-
-	// Get stores
-	sourceClient, err := CreateClientForStore(*req.SourceStore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create source store: %w", err)
-	}
-	destClient, err := CreateClientForStore(*req.DestStore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dest store: %w", err)
-	}
-
-	// Notify
-	logrus.WithField("keys", req.Keys).WithField("filters", req.KeyFilters).Infof("Handling sync")
 
 	// Spawn sync orchestrator which handles sync requests
-	stopCh := make(chan struct{}, 1)
-	doneCh := make(chan struct{}, 1)
-	go func() {
-		defer close(doneCh)
-
-		// Handle sync
-		syncTicker := time.NewTicker(req.GetSyncPeriod())
-		defer syncTicker.Stop()
-		for syncID := 1; ; syncID++ {
-			// Synchronize
-			doSync(syncID, sourceClient, destClient, req.Keys, req.KeyFilters)
-
-			// Handle once
-			if req.SyncOnce {
-				return
-			}
-
-			// Handle triggers
-			select {
-			case <-syncTicker.C:
-				continue
-
-			case <-stopCh:
-				return
-			}
-		}
-	}()
+	go h.handle()
 
 	// Return manager
-	return &handler{
-		stopCh: stopCh,
-		doneCh: doneCh,
-	}, nil
+	return h, nil
 }
 
 // Stop will stop synchronization. Safe for concurrent usage.
@@ -109,14 +67,94 @@ func (h *handler) Wait() {
 	<-h.doneCh
 }
 
+func (h *handler) Set(config apis.SyncSecretStoreSpec) error {
+	if err := h.Validate(config); err != nil {
+		return fmt.Errorf("failed to validate config: %w", err)
+	}
+
+	// Get stores
+	sourceClient, err := CreateClientForStore(*config.SourceStore)
+	if err != nil {
+		return fmt.Errorf("failed to create source store client: %w", err)
+	}
+	destClient, err := CreateClientForStore(*config.DestStore)
+	if err != nil {
+		return fmt.Errorf("failed to create dest store client: %w", err)
+	}
+
+	// Update
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.source = sourceClient
+	h.dest = destClient
+	h.options = config
+
+	return nil
+}
+
+func (h *handler) Validate(config apis.SyncSecretStoreSpec) error {
+	// Validate request
+	if config.SourceStore == nil {
+		return fmt.Errorf("empty .SourceStore")
+	}
+	if config.DestStore == nil {
+		return fmt.Errorf("empty .DestStore")
+	}
+	if len(config.KeyFilters) == 0 && len(config.Keys) == 0 {
+		return fmt.Errorf("both .KeyFilters and .Keys empty, at least one required")
+	}
+
+	// Validate permissions
+	sourcePerms := config.SourceStore.GetPermissions()
+	if !sourcePerms.CanPerform(apis.SecretStoreRead) {
+		return fmt.Errorf("source requires Read permissions, got %s", sourcePerms)
+	}
+	destPerms := config.DestStore.GetPermissions()
+	if !destPerms.CanPerform(apis.SecretStoreWrite) {
+		return fmt.Errorf("dest requires Write permissions, got %s", destPerms)
+	}
+
+	return nil
+}
+
+func (h *handler) handle() {
+	defer close(h.doneCh)
+
+	// Notify
+	logrus.WithField("keys", h.options.Keys).WithField("filters", h.options.KeyFilters).Infof("Handling sync")
+
+	// Handle sync
+	syncTicker := time.NewTicker(h.options.GetSyncPeriod())
+	defer syncTicker.Stop()
+	for syncID := 1; ; syncID++ {
+		// Synchronize
+		h.doSync(syncID)
+
+		// Handle once
+		if h.options.SyncOnce {
+			return
+		}
+
+		// Handle triggers
+		select {
+		case <-syncTicker.C:
+			continue
+
+		case <-h.stopCh:
+			return
+		}
+	}
+}
+
 // doSync executes synchronization logic for provided params.
-func doSync(syncID int, source apis.StoreReader, dest apis.StoreWriter, keys []apis.StoreKey, listFilters []string) {
+func (h *handler) doSync(syncID int) {
 	log := logrus.WithField("id", syncID)
 
 	log.Infof("Sync id=%d triggered, refreshing...", syncID)
 
 	// Fetch filtered list keys from source
-	listKeys, err := getFilteredListKeys(log, listFilters, source)
+	listKeys, err := h.getFilteredListKeys(log)
 	if err != nil {
 		log.WithError(err).Errorf("Failed to list keys from source")
 	} else if len(listKeys) > 0 {
@@ -124,7 +162,7 @@ func doSync(syncID int, source apis.StoreReader, dest apis.StoreWriter, keys []a
 	}
 
 	// Sync all keys between source and dest
-	<-syncKeys(log, append(listKeys, keys...), source, dest)
+	<-h.syncKeys(log, append(listKeys, h.options.Keys...))
 
 	log.Infof("Sync id=%d completed", syncID)
 }
@@ -132,7 +170,7 @@ func doSync(syncID int, source apis.StoreReader, dest apis.StoreWriter, keys []a
 // syncKeys handles key synchronization from source to dest.
 // Each key sync request will be processed in a separate goroutine.
 // Returns a channel that can be consumed to wait for processing.
-func syncKeys(log *logrus.Entry, keys []apis.StoreKey, source apis.StoreReader, dest apis.StoreWriter) <-chan struct{} {
+func (h *handler) syncKeys(log *logrus.Entry, keys []apis.StoreKey) <-chan struct{} {
 	// Do sync for each key in a separate goroutine
 	wg := sync.WaitGroup{}
 	for _, key := range removeDuplicates(keys) {
@@ -141,14 +179,35 @@ func syncKeys(log *logrus.Entry, keys []apis.StoreKey, source apis.StoreReader, 
 			defer wg.Done()
 
 			// Get
-			value, err := source.GetSecret(context.Background(), key)
+			value, err := h.source.GetSecret(context.Background(), key)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to sync key '%s'", key.Key)
 				return
 			}
 
+			// Execute template
+			if tpl := h.options.GetSyncTemplate(); tpl != nil {
+				// Apply template
+				var data []byte
+				writer := bytes.NewBuffer(data)
+				err := tpl.Execute(writer, key)
+				if err != nil {
+					log.WithError(err).Errorf("Failed to apply template on key '%s'", key.Key)
+					return
+				}
+
+				// Get updated object
+				var updatedKey apis.StoreKey
+				bytesData := writer.Bytes()
+				if err := json.Unmarshal(bytesData, &updatedKey); err != nil {
+					log.WithError(err).Errorf("Failed to unmarshal templated output on key '%s'", key.Key)
+					return
+				}
+				key = updatedKey
+			}
+
 			// Set
-			err = dest.SetSecret(context.Background(), key, value)
+			err = h.dest.SetSecret(context.Background(), key, value)
 			if err != nil {
 				log.WithError(err).Errorf("Failed to sync key '%s'", key.Key)
 				return
@@ -170,14 +229,14 @@ func syncKeys(log *logrus.Entry, keys []apis.StoreKey, source apis.StoreReader, 
 
 // getFilteredListKeys returns keys fetched from source that match regex any regex filters.
 // Returns nil slice when no filters have passed.
-func getFilteredListKeys(log *logrus.Entry, filters []string, source apis.StoreReader) ([]apis.StoreKey, error) {
+func (h *handler) getFilteredListKeys(log *logrus.Entry) ([]apis.StoreKey, error) {
 	// Skip on no filters
-	if len(filters) == 0 {
+	if len(h.options.KeyFilters) == 0 {
 		return nil, nil
 	}
 
 	// List
-	keys, err := source.ListSecretKeys(context.Background())
+	keys, err := h.source.ListSecretKeys(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +244,7 @@ func getFilteredListKeys(log *logrus.Entry, filters []string, source apis.StoreR
 	// Filter
 	var filteredKeys []apis.StoreKey
 	for _, key := range keys {
-		for _, filter := range filters {
+		for _, filter := range h.options.KeyFilters {
 			if matches, err := regexp.MatchString(filter, key.Key); err != nil {
 				log.WithError(err).Errorf("Failed while applying filter '%s' to key %#v", filter, key)
 			} else if matches {

@@ -13,10 +13,10 @@ var testCtx = context.Background()
 
 func TestSync(t *testing.T) {
 	// Create secret stores
-	//sourceSpec, sourceClient := createFileStore(t, "from-dir")
-	//destSpec, destClient := createFileStore(t, "to-dir")
-	sourceSpec, sourceClient := createVaultStore(t, "http://0.0.0.0:8200", "root")
-	destSpec, destClient := createVaultStore(t, "http://0.0.0.0:8201", "root")
+	sourceSpec, sourceClient := createFileStore(t, "from-dir")
+	destSpec, destClient := createFileStore(t, "to-dir")
+	//sourceSpec, sourceClient := createVaultStore(t, "http://0.0.0.0:8200", "root")
+	//destSpec, destClient := createVaultStore(t, "http://0.0.0.0:8201", "root")
 
 	// Define store and sync data
 	syncKeys := convertKeys("a", "b/b", "c/c/c")
@@ -25,7 +25,6 @@ func TestSync(t *testing.T) {
 		"a",
 		"b/b",
 		"c/c/c",
-		"d/d/d",
 		"d/d/d/0",
 		"d/d/d/1",
 		"d/d/d/2",
