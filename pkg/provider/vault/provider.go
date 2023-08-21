@@ -12,38 +12,38 @@ type Provider struct{}
 var _ apis.Provider = &Provider{}
 
 func (p *Provider) NewClient(_ context.Context, store apis.SecretStoreSpec) (apis.StoreClient, error) {
-	provider := store.Provider.Vault
+	providerVault := store.Provider.Vault
 	apiClient, err := vault.NewClientWithOptions(
-		vault.ClientURL(provider.Address),
-		vault.ClientRole(provider.Role),
-		vault.ClientAuthPath(provider.AuthPath),
-		vault.ClientTokenPath(provider.TokenPath),
-		vault.ClientToken(provider.Token))
+		vault.ClientURL(providerVault.Address),
+		vault.ClientRole(providerVault.Role),
+		vault.ClientAuthPath(providerVault.AuthPath),
+		vault.ClientTokenPath(providerVault.TokenPath),
+		vault.ClientToken(providerVault.Token))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
 	return &client{
 		apiClient:  apiClient,
-		apiKeyPath: provider.UnsealKeysPath,
+		apiKeyPath: providerVault.UnsealKeysPath,
 	}, nil
 }
 
 func (p *Provider) Validate(store apis.SecretStoreSpec) error {
-	provider := store.Provider.Vault
-	if provider == nil {
+	providerVault := store.Provider.Vault
+	if providerVault == nil {
 		return fmt.Errorf("empty .Vault")
 	}
-	if provider.Address == "" {
+	if providerVault.Address == "" {
 		return fmt.Errorf("empty .Vault.Address")
 	}
-	if provider.UnsealKeysPath == "" {
+	if providerVault.UnsealKeysPath == "" {
 		return fmt.Errorf("empty .Vault.UnsealKeysPath")
 	}
-	if provider.AuthPath == "" {
+	if providerVault.AuthPath == "" {
 		return fmt.Errorf("empty .Vault.AuthPath")
 	}
-	if provider.Token == "" {
+	if providerVault.Token == "" {
 		return fmt.Errorf("empty .Vault.Token")
 	}
 	return nil

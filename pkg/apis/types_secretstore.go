@@ -10,7 +10,7 @@ var DefaultSecretStorePermissions = SecretStoreReadWrite
 type SecretStoreSpec struct {
 	// Used to configure secrets provider.
 	// Required
-	Provider *SecretStoreProvider `json:"provider"`
+	Provider SecretStoreProvider `json:"provider"`
 
 	// Used to configure store mode. Defaults to ReadWrite.
 	// Optional

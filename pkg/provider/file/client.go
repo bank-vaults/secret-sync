@@ -30,7 +30,7 @@ func (c *client) ListSecretKeys(_ context.Context) ([]apis.StoreKey, error) {
 	var result []apis.StoreKey
 	err := filepath.Walk(c.dir, func(path string, info fs.FileInfo, err error) error {
 		// Only add files
-		if info.Mode().IsRegular() {
+		if info != nil && info.Mode().IsRegular() {
 			relPath := strings.ReplaceAll(path, filepath.Clean(c.dir)+"/", "")
 			result = append(result, apis.StoreKey{
 				Key: filepath.ToSlash(relPath),

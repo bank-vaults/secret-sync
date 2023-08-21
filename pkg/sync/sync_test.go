@@ -3,6 +3,7 @@ package sync_test
 import (
 	"context"
 	"github.com/bank-vaults/secret-sync/pkg/apis"
+	"github.com/bank-vaults/secret-sync/pkg/provider"
 	"github.com/bank-vaults/secret-sync/pkg/sync"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -41,17 +42,18 @@ func TestSync(t *testing.T) {
 	}
 
 	// Sync dest using both Keys and KeyFilters
-	manager, err := sync.HandleSync(apis.SyncSecretStoreSpec{
-		SourceStore: &sourceSpec,
-		DestStore:   &destSpec,
+	manager, err := sync.Handle(apis.SyncJobSpec{
+		SourceStore: sourceSpec,
+		DestStore:   destSpec,
 		Keys:        syncKeys,
 		KeyFilters:  syncFilters,
-		SyncOnce:    true,
+		RunOnce:     true,
 	})
 	assert.Nil(t, err)
 
-	// Wait for first sync
+	// Wait for sync
 	manager.Wait()
+	assert.Equal(t, manager.LastStatus().Success, true)
 
 	// Validate that dest is synced
 	for _, key := range expected {
@@ -67,20 +69,20 @@ func createFileStore(t *testing.T, name string) (apis.SecretStoreSpec, apis.Stor
 	t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 	store := apis.SecretStoreSpec{
-		Provider: &apis.SecretStoreProvider{
+		Provider: apis.SecretStoreProvider{
 			File: &apis.SecretStoreProviderFile{
 				ParentDir: path,
 			},
 		},
 	}
-	client, err := sync.CreateClientForStore(store)
+	client, err := provider.CreateClient(context.Background(), store)
 	assert.Nil(t, err)
 	return store, client
 }
 
 func createVaultStore(t *testing.T, addr, token string) (apis.SecretStoreSpec, apis.StoreClient) {
 	store := apis.SecretStoreSpec{
-		Provider: &apis.SecretStoreProvider{
+		Provider: apis.SecretStoreProvider{
 			Vault: &apis.SecretStoreProviderVault{
 				Address:        addr,
 				UnsealKeysPath: "secret",
@@ -89,7 +91,7 @@ func createVaultStore(t *testing.T, addr, token string) (apis.SecretStoreSpec, a
 			},
 		},
 	}
-	client, err := sync.CreateClientForStore(store)
+	client, err := provider.CreateClient(context.Background(), store)
 	assert.Nil(t, err)
 	return store, client
 }

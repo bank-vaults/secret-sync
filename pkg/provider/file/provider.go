@@ -11,18 +11,17 @@ type Provider struct{}
 var _ apis.Provider = &Provider{}
 
 func (p *Provider) NewClient(_ context.Context, store apis.SecretStoreSpec) (apis.StoreClient, error) {
-	provider := store.Provider.File
 	return &client{
-		dir: provider.ParentDir,
+		dir: store.Provider.File.ParentDir,
 	}, nil
 }
 
 func (p *Provider) Validate(store apis.SecretStoreSpec) error {
-	provider := store.Provider.File
-	if provider == nil {
+	providerFile := store.Provider.File
+	if providerFile == nil {
 		return fmt.Errorf("empty .File")
 	}
-	if provider.ParentDir == "" {
+	if providerFile.ParentDir == "" {
 		return fmt.Errorf("empty .File.ParentDir")
 	}
 	return nil

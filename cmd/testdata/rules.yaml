@@ -1,0 +1,11 @@
+keys:
+  - a
+  - b/b
+  - c/c/c
+listFilters:
+  - "d/d/d/.*"
+template: |
+  {
+    "key": "{{.Key}}/new-key", 
+    "version": "2"
+  }

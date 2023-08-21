@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/bank-vaults/secret-sync/pkg/apis"
 	"github.com/bank-vaults/secret-sync/pkg/sync"
+	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"os"
-	"time"
 )
 
 func NewSyncCmd() *cobra.Command {
@@ -34,8 +33,8 @@ func NewSyncCmd() *cobra.Command {
 	cobraCmd.Flags().StringSliceVar(&cmd.flagKeys, "key", []string{}, "Key to sync. Can specify multiple. Rule file must be empty.")
 	cobraCmd.Flags().StringSliceVar(&cmd.flagFilters, "filter", []string{}, "Regex filter for source list keys. Can specify multiple. Rule file must be empty.")
 
-	cobraCmd.Flags().DurationVar(&cmd.flagPeriod, "period", apis.DefaultSyncRequestPeriod, "Synchronization period")
-	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false, "Synchronization once and exit")
+	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", apis.DefaultSyncJobSchedule, "Synchronization CRON schedule")
+	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false, "Synchronize once and exit")
 
 	return cobraCmd
 }
@@ -46,7 +45,7 @@ type syncCmd struct {
 	flgSrcFile   string
 	flagDstFile  string
 	flagRuleFile string
-	flagPeriod   time.Duration
+	flagSchedule string
 	flagOnce     bool
 
 	source  *apis.SecretStoreSpec
@@ -86,14 +85,14 @@ func (cmd *syncCmd) init() error {
 
 func (cmd *syncCmd) run() error {
 	// Start sync
-	mgr, err := sync.HandleSync(apis.SyncSecretStoreSpec{
-		SourceStore:  cmd.source,
-		DestStore:    cmd.dest,
-		Keys:         keysToStoreKeys(cmd.ruleCfg.Keys),
-		KeyFilters:   cmd.ruleCfg.ListFilters,
-		SyncTemplate: cmd.ruleCfg.Template,
-		SyncPeriod:   cmd.flagPeriod.String(),
-		SyncOnce:     cmd.flagOnce,
+	mgr, err := sync.Handle(apis.SyncJobSpec{
+		SourceStore: *cmd.source,
+		DestStore:   *cmd.dest,
+		Keys:        keysToStoreKeys(cmd.ruleCfg.Keys),
+		KeyFilters:  cmd.ruleCfg.ListFilters,
+		Template:    cmd.ruleCfg.Template,
+		Schedule:    cmd.flagSchedule,
+		RunOnce:     cmd.flagOnce,
 	})
 	if err != nil {
 		return err
@@ -113,14 +112,18 @@ type ruleConfig struct {
 
 func loadRuleSpecs(path string) (*ruleConfig, error) {
 	// Load file
-	ruleBytes, err := os.ReadFile(path)
+	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal
 	var ruleCfg ruleConfig
-	if err := json.Unmarshal(ruleBytes, &ruleCfg); err != nil {
+	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(jsonBytes, &ruleCfg); err != nil {
 		return nil, err
 	}
 	return &ruleCfg, nil
@@ -128,15 +131,19 @@ func loadRuleSpecs(path string) (*ruleConfig, error) {
 
 func loadStoreSpec(path string) (*apis.SecretStoreSpec, error) {
 	// Load file
-	specBytes, err := os.ReadFile(path)
+	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// Unmarshal
 	var spec apis.SecretStoreSpec
-	if err := json.Unmarshal(specBytes, &spec); err != nil {
-		return nil, fmt.Errorf("could not unmarshal file %s: %w", path, err)
+	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(jsonBytes, &spec); err != nil {
+		return nil, err
 	}
 	return &spec, nil
 }

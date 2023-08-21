@@ -1,0 +1,4 @@
+permissions: ReadWrite
+provider:
+  file:
+    parent-dir: "/tmp/store-dest"

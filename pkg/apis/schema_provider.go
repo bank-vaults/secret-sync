@@ -14,27 +14,26 @@ var providerMu = sync.RWMutex{}
 func Register(provider Provider, providerSpec *SecretStoreProvider) {
 	providerName, err := getProviderName(providerSpec)
 	if err != nil {
-		panic(fmt.Errorf("secretstore error registering provider schema: %w", err))
+		panic(fmt.Errorf("error registering secretstore backend: %w", err))
 	}
 
 	providerMu.Lock()
 	defer providerMu.Unlock()
 	if _, exists := providers[providerName]; exists {
-		panic(fmt.Errorf("secretstore provider %q already registered", providerName))
+		panic(fmt.Errorf("secretstore backend %q already registered", providerName))
 	}
 
 	providers[providerName] = provider
 }
 
 // GetProvider returns the provider for SecretStoreSpec.
-// TODO: This should accept SecretStore CR.
-func GetProvider(spec *SecretStoreSpec) (Provider, error) {
+func GetProvider(spec *SecretStoreProvider) (Provider, error) {
 	if spec == nil {
-		return nil, fmt.Errorf("no secretstore spec found for %#v", spec)
+		return nil, fmt.Errorf("no SecretStoreSpec provided")
 	}
-	providerName, err := getProviderName(spec.Provider)
+	providerName, err := getProviderName(spec)
 	if err != nil {
-		return nil, fmt.Errorf("secretstore error for %#v: %w", spec, err)
+		return nil, fmt.Errorf("failed to get store provider: %w", err)
 	}
 
 	providerMu.RLock()
@@ -42,7 +41,7 @@ func GetProvider(spec *SecretStoreSpec) (Provider, error) {
 	providerMu.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("failed to find registered store backend %q for %#v", providerName, spec)
+		return nil, fmt.Errorf("failed to find registered store backend %q", providerName)
 	}
 
 	return provider, nil
@@ -53,15 +52,15 @@ func GetProvider(spec *SecretStoreSpec) (Provider, error) {
 func getProviderName(providerSpec *SecretStoreProvider) (string, error) {
 	providerBytes, err := json.Marshal(providerSpec)
 	if err != nil || providerBytes == nil {
-		return "", fmt.Errorf("failed to marshal secretstore provider spec: %w", err)
+		return "", fmt.Errorf("failed to marshal SecretStoreProvider: %w", err)
 	}
 
 	providerMap := make(map[string]interface{})
 	if err = json.Unmarshal(providerBytes, &providerMap); err != nil {
-		return "", fmt.Errorf("failed to unmarshal secretstore provider spec: %w", err)
+		return "", fmt.Errorf("failed to unmarshal SecretStoreProvider: %w", err)
 	}
 	if len(providerMap) != 1 {
-		return "", fmt.Errorf("secretstore can have only one backend specified, found %d", len(providerMap))
+		return "", fmt.Errorf("only one store backend required for SecretStoreProvider, found %d", len(providerMap))
 	}
 
 	for k := range providerMap {

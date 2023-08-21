@@ -27,11 +27,11 @@ type StoreClient interface {
 
 // Provider defines methods to interact with secret backends.
 type Provider interface {
-	// NewClient creates a new secret StoreClient for provided store config.
+	// NewClient creates a new secret StoreClient for provider config.
 	// TODO: This should accept SecretStore CR.
 	NewClient(ctx context.Context, store SecretStoreSpec) (StoreClient, error)
 
-	// Validate checks if the provided store config is valid.
+	// Validate checks if the provider config is valid.
 	// TODO: This should accept SecretStore CR.
 	Validate(store SecretStoreSpec) error
 }
