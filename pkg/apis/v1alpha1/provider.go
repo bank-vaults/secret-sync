@@ -1,8 +1,20 @@
-package apis
+package v1alpha1
 
 import (
 	"context"
+	"errors"
 )
+
+var ErrStoreKeyNotFound = errors.New("secret key not found")
+
+// Provider defines methods to manage store clients.
+type Provider interface {
+	// NewClient creates a new secret StoreClient for provided backend.
+	NewClient(ctx context.Context, backend SecretStoreProvider) (StoreClient, error)
+
+	// Validate checks if the provided backend is valid.
+	Validate(backend SecretStoreProvider) error
+}
 
 // StoreReader implements read ops for a secret backend.
 type StoreReader interface {
@@ -23,15 +35,4 @@ type StoreWriter interface {
 type StoreClient interface {
 	StoreReader
 	StoreWriter
-}
-
-// Provider defines methods to interact with secret backends.
-type Provider interface {
-	// NewClient creates a new secret StoreClient for provider config.
-	// TODO: This should accept SecretStore CR.
-	NewClient(ctx context.Context, store SecretStoreSpec) (StoreClient, error)
-
-	// Validate checks if the provider config is valid.
-	// TODO: This should accept SecretStore CR.
-	Validate(store SecretStoreSpec) error
 }

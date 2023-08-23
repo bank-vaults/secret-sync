@@ -1,0 +1,48 @@
+## Used to configure the source for sync request.
+## Currently loaded from a file.
+# source-store:
+#   name:
+#   namespace:
+
+## Used to configure the destination of sync request.
+## Currently loaded from a file.
+# dest-store:
+#   name:
+#   namespace:
+
+## Used to specify keys that will be synced.
+## These keys will always be added for syncing.
+keys:
+  - key: a
+  - key: b/b
+    version: "1"
+  - key: c/c/c
+    version: "2"
+
+## Used to configure regex filters to apply on listed keys.
+## Only keys that satisfy one of the regex will be added for sync.
+## Predefined keys from previous section will always be unaffected.
+list-filters:
+  - "d/d/d/.*"
+
+## Template is applied to every key struct before sync.
+## Must return a valid JSON SecretKey object.
+template: |
+  {
+    "key": "{{.Key}}/new-key", 
+    "version": "2"
+  }
+
+## Used to configure schedule for synchronization.
+## The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
+schedule: "@daily"
+
+## Used to only perform sync once.
+## If specified, Schedule will be ignored.
+run-once: false
+
+## The number of latest sync results to retain in-memory.
+history-limit: 128
+
+## Points to a file where all sync logs should be saved to.
+audit-log-path: "path/to/file"

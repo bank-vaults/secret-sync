@@ -3,54 +3,52 @@ package vault
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis"
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 	"github.com/bank-vaults/vault-sdk/vault"
 )
 
 type Provider struct{}
 
-var _ apis.Provider = &Provider{}
-
-func (p *Provider) NewClient(_ context.Context, store apis.SecretStoreSpec) (apis.StoreClient, error) {
-	providerVault := store.Provider.Vault
+func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreProvider) (v1alpha1.StoreClient, error) {
+	vaultCfg := backend.Vault
 	apiClient, err := vault.NewClientWithOptions(
-		vault.ClientURL(providerVault.Address),
-		vault.ClientRole(providerVault.Role),
-		vault.ClientAuthPath(providerVault.AuthPath),
-		vault.ClientTokenPath(providerVault.TokenPath),
-		vault.ClientToken(providerVault.Token))
+		vault.ClientURL(vaultCfg.Address),
+		vault.ClientRole(vaultCfg.Role),
+		vault.ClientAuthPath(vaultCfg.AuthPath),
+		vault.ClientTokenPath(vaultCfg.TokenPath),
+		vault.ClientToken(vaultCfg.Token))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
 	return &client{
 		apiClient:  apiClient,
-		apiKeyPath: providerVault.UnsealKeysPath,
+		apiKeyPath: vaultCfg.UnsealKeysPath,
 	}, nil
 }
 
-func (p *Provider) Validate(store apis.SecretStoreSpec) error {
-	providerVault := store.Provider.Vault
-	if providerVault == nil {
-		return fmt.Errorf("empty .Vault")
+func (p *Provider) Validate(backend v1alpha1.SecretStoreProvider) error {
+	vaultCfg := backend.Vault
+	if vaultCfg == nil {
+		return fmt.Errorf("empty Vault config")
 	}
-	if providerVault.Address == "" {
+	if vaultCfg.Address == "" {
 		return fmt.Errorf("empty .Vault.Address")
 	}
-	if providerVault.UnsealKeysPath == "" {
+	if vaultCfg.UnsealKeysPath == "" {
 		return fmt.Errorf("empty .Vault.UnsealKeysPath")
 	}
-	if providerVault.AuthPath == "" {
+	if vaultCfg.AuthPath == "" {
 		return fmt.Errorf("empty .Vault.AuthPath")
 	}
-	if providerVault.Token == "" {
+	if vaultCfg.Token == "" {
 		return fmt.Errorf("empty .Vault.Token")
 	}
 	return nil
 }
 
 func init() {
-	apis.Register(&Provider{}, &apis.SecretStoreProvider{
-		Vault: &apis.SecretStoreProviderVault{},
+	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreProvider{
+		Vault: &v1alpha1.SecretStoreProviderVault{},
 	})
 }

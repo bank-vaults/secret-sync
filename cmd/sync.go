@@ -1,12 +1,18 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/bank-vaults/secret-sync/pkg/apis"
-	"github.com/bank-vaults/secret-sync/pkg/sync"
+	"fmt"
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
+	"github.com/bank-vaults/secret-sync/pkg/provider"
+	"github.com/bank-vaults/secret-sync/pkg/storesync"
 	"github.com/ghodss/yaml"
+	"github.com/krayzpipes/cronticker/cronticker"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
+	"os/signal"
 )
 
 func NewSyncCmd() *cobra.Command {
@@ -19,7 +25,7 @@ func NewSyncCmd() *cobra.Command {
 			if err := cmd.init(); err != nil {
 				return err
 			}
-			return cmd.run()
+			return cmd.run(cmd.sync)
 		},
 	}
 
@@ -28,13 +34,13 @@ func NewSyncCmd() *cobra.Command {
 	_ = cobraCmd.MarkFlagRequired("source")
 	cobraCmd.Flags().StringVar(&cmd.flagDstFile, "dest", "", "Destination store config file")
 	_ = cobraCmd.MarkFlagRequired("dest")
-	cobraCmd.Flags().StringVar(&cmd.flagRuleFile, "rule", "", "Rule file containing keys and filters. Not needed if --key or --filter used")
+	cobraCmd.Flags().StringVar(&cmd.flagSyncFile, "sync", "", "Sync job config file")
 
-	cobraCmd.Flags().StringSliceVar(&cmd.flagKeys, "key", []string{}, "Key to sync. Can specify multiple. Rule file must be empty.")
-	cobraCmd.Flags().StringSliceVar(&cmd.flagFilters, "filter", []string{}, "Regex filter for source list keys. Can specify multiple. Rule file must be empty.")
-
-	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", apis.DefaultSyncJobSchedule, "Synchronization CRON schedule")
-	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false, "Synchronize once and exit")
+	cobraCmd.Flags().StringSliceVar(&cmd.flagKeys, "key", []string{}, "Key to sync. Can specify multiple. Overrides --sync params")
+	cobraCmd.Flags().StringSliceVar(&cmd.flagFilters, "filter", []string{}, "Regex filter for source list keys. Can specify multiple. Overrides --sync params")
+	cobraCmd.Flags().StringVar(&cmd.flagTemplate, "template", "", "Conversion template to use. Overrides --sync params")
+	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", v1alpha1.DefaultSyncJobSchedule, "Synchronization CRON schedule. Overrides --sync params")
+	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false, "Synchronize once and exit. Overrides --sync params")
 
 	return cobraCmd
 }
@@ -44,81 +50,124 @@ type syncCmd struct {
 	flagFilters  []string
 	flgSrcFile   string
 	flagDstFile  string
-	flagRuleFile string
+	flagSyncFile string
+	flagTemplate string
 	flagSchedule string
 	flagOnce     bool
 
-	source  *apis.SecretStoreSpec
-	dest    *apis.SecretStoreSpec
-	ruleCfg *ruleConfig
+	source v1alpha1.StoreReader
+	dest   v1alpha1.StoreWriter
+	sync   v1alpha1.SyncJobSpec
 }
 
 func (cmd *syncCmd) init() error {
 	var err error
 
 	// Init source
-	cmd.source, err = loadStoreSpec(cmd.flgSrcFile)
+	srcStore, err := loadStore(cmd.flgSrcFile)
+	if err != nil {
+		return err
+	}
+	if !srcStore.GetPermissions().CanPerform(v1alpha1.SecretStorePermissionsRead) {
+		return fmt.Errorf("source does not have Read permissions")
+	}
+	cmd.source, err = provider.NewClient(context.Background(), &srcStore.Provider)
 	if err != nil {
 		return err
 	}
 
 	// Init dest
-	cmd.dest, err = loadStoreSpec(cmd.flagDstFile)
+	destStore, err := loadStore(cmd.flagDstFile)
+	if err != nil {
+		return err
+	}
+	if !destStore.GetPermissions().CanPerform(v1alpha1.SecretStorePermissionsWrite) {
+		return fmt.Errorf("dest does not have Write permissions")
+	}
+	cmd.dest, err = provider.NewClient(context.Background(), &destStore.Provider)
 	if err != nil {
 		return err
 	}
 
-	// Init rule config
-	cmd.ruleCfg = &ruleConfig{
-		Keys:        cmd.flagKeys,
-		ListFilters: cmd.flagFilters,
-	}
-	if cmd.flagRuleFile != "" {
-		cmd.ruleCfg, err = loadRuleSpecs(cmd.flagRuleFile)
+	// Init sync request by loading from file and overriding from cli
+	if cmd.flagSyncFile != "" {
+		request, err := loadRequest(cmd.flagSyncFile)
 		if err != nil {
 			return err
 		}
+		cmd.sync = *request
+	}
+	if len(cmd.flagKeys) > 0 {
+		cmd.sync.Keys = keysToStoreKeys(cmd.flagKeys)
+	}
+	if len(cmd.flagFilters) > 0 {
+		cmd.sync.ListFilters = cmd.flagFilters
+	}
+	if cmd.flagTemplate != "" {
+		cmd.sync.Template = cmd.flagTemplate
+	}
+	if cmd.flagOnce {
+		cmd.sync.RunOnce = cmd.flagOnce
+	}
+	if cmd.flagSchedule != "" {
+		cmd.sync.Schedule = cmd.flagSchedule
 	}
 
 	return nil
 }
 
-func (cmd *syncCmd) run() error {
-	// Start sync
-	mgr, err := sync.Handle(apis.SyncJobSpec{
-		SourceStore: *cmd.source,
-		DestStore:   *cmd.dest,
-		Keys:        keysToStoreKeys(cmd.ruleCfg.Keys),
-		KeyFilters:  cmd.ruleCfg.ListFilters,
-		Template:    cmd.ruleCfg.Template,
-		Schedule:    cmd.flagSchedule,
-		RunOnce:     cmd.flagOnce,
-	})
-	if err != nil {
+func (cmd *syncCmd) run(syncReq v1alpha1.SyncJobSpec) error {
+	// Create request
+	request := storesync.Request{
+		Source:       cmd.source,
+		Dest:         cmd.dest,
+		Keys:         syncReq.Keys,
+		ListFilters:  syncReq.GetListFilters(),
+		SetConverter: syncReq.ConvertKey,
+	}
+
+	// Run once
+	if syncReq.RunOnce {
+		resp, err := storesync.Sync(context.Background(), request)
+		if resp != nil {
+			logrus.Info(resp.Status)
+		}
 		return err
 	}
 
-	// Wait
-	mgr.Wait()
+	// Run on schedule
+	cronTicker, err := cronticker.NewTicker(syncReq.Schedule)
+	if err != nil {
+		return err
+	}
+	defer cronTicker.Stop()
+	cancel := make(chan os.Signal, 1)
+	signal.Notify(cancel, os.Interrupt)
+	for {
+		select {
+		case <-cronTicker.C:
+			logrus.Info("Handling a new sync request...")
+			resp, _ := storesync.Sync(context.Background(), request)
+			if resp != nil {
+				logrus.Info(resp.Status)
+			}
 
-	return nil
+		case <-cancel:
+			return nil
+		}
+	}
 }
 
-type ruleConfig struct {
-	Keys        []string `json:"keys"`
-	ListFilters []string `json:"listFilters"`
-	Template    string   `json:"template"`
-}
-
-func loadRuleSpecs(path string) (*ruleConfig, error) {
+// loadRequest loads apis.SyncJobSpec data from a YAML file.
+func loadRequest(path string) (*v1alpha1.SyncJobSpec, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// Unmarshal
-	var ruleCfg ruleConfig
+	// Unmarshal (convert YAML to JSON)
+	var ruleCfg v1alpha1.SyncJobSpec
 	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 	if err != nil {
 		return nil, err
@@ -129,15 +178,16 @@ func loadRuleSpecs(path string) (*ruleConfig, error) {
 	return &ruleCfg, nil
 }
 
-func loadStoreSpec(path string) (*apis.SecretStoreSpec, error) {
+// loadStore loads apis.SecretStoreSpec from a YAML file.
+func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// Unmarshal
-	var spec apis.SecretStoreSpec
+	// Unmarshal (convert YAML to JSON)
+	var spec v1alpha1.SecretStoreSpec
 	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 	if err != nil {
 		return nil, err
@@ -148,10 +198,10 @@ func loadStoreSpec(path string) (*apis.SecretStoreSpec, error) {
 	return &spec, nil
 }
 
-func keysToStoreKeys(keys []string) []apis.StoreKey {
-	result := make([]apis.StoreKey, 0)
+func keysToStoreKeys(keys []string) []v1alpha1.StoreKey {
+	result := make([]v1alpha1.StoreKey, 0)
 	for _, key := range keys {
-		result = append(result, apis.StoreKey{
+		result = append(result, v1alpha1.StoreKey{
 			Key: key,
 		})
 	}

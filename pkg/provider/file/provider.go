@@ -3,32 +3,29 @@ package file
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis"
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
 type Provider struct{}
 
-var _ apis.Provider = &Provider{}
-
-func (p *Provider) NewClient(_ context.Context, store apis.SecretStoreSpec) (apis.StoreClient, error) {
+func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreProvider) (v1alpha1.StoreClient, error) {
 	return &client{
-		dir: store.Provider.File.ParentDir,
+		dir: backend.File.DirPath,
 	}, nil
 }
 
-func (p *Provider) Validate(store apis.SecretStoreSpec) error {
-	providerFile := store.Provider.File
-	if providerFile == nil {
+func (p *Provider) Validate(backend v1alpha1.SecretStoreProvider) error {
+	if backend.File == nil {
 		return fmt.Errorf("empty .File")
 	}
-	if providerFile.ParentDir == "" {
-		return fmt.Errorf("empty .File.ParentDir")
+	if backend.File.DirPath == "" {
+		return fmt.Errorf("empty .File.DirPath")
 	}
 	return nil
 }
 
 func init() {
-	apis.Register(&Provider{}, &apis.SecretStoreProvider{
-		File: &apis.SecretStoreProviderFile{},
+	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreProvider{
+		File: &v1alpha1.SecretStoreProviderFile{},
 	})
 }
