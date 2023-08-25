@@ -119,11 +119,11 @@ func (cmd *syncCmd) init() error {
 func (cmd *syncCmd) run(syncReq v1alpha1.SyncJobSpec) error {
 	// Create request
 	request := storesync.Request{
-		Source:       cmd.source,
-		Dest:         cmd.dest,
-		Keys:         syncReq.Keys,
-		ListFilters:  syncReq.GetListFilters(),
-		SetConverter: syncReq.ConvertKey,
+		Source:      cmd.source,
+		Dest:        cmd.dest,
+		Keys:        syncReq.Keys,
+		ListFilters: syncReq.GetListFilters(),
+		Converter:   syncReq.ConvertKey,
 	}
 
 	// Run once

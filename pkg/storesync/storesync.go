@@ -14,8 +14,16 @@ import (
 // Request defines request data to use when performing Sync to synchronize data
 // from Source to Dest.
 type Request struct {
+	// Source defines the store from which the keys will be fetched. All keys
+	// specified by Keys and keys that match ListFilters listed from Source will be
+	// fetched via Source.GetSecret.
+	// Required
 	Source v1alpha1.StoreReader
-	Dest   v1alpha1.StoreWriter
+
+	// Dest defines destination of fetched secrets. If Converter is present, then
+	// keys will be converted before performing Dest.SetSecret.
+	// Required
+	Dest v1alpha1.StoreWriter
 
 	// Keys defines which keys to sync will be added to sync queue.
 	// Optional
@@ -27,11 +35,11 @@ type Request struct {
 	// Optional
 	ListFilters []*regexp.Regexp
 
-	// SetConverter defines the function that will be called on every key before
+	// Converter defines the function that will be called on every key before
 	// being sent to Dest. It is used to dynamically change request key data for dest.
 	// For example, when needed to add suffix to key.
 	// Optional
-	SetConverter func(v1alpha1.StoreKey) (*v1alpha1.StoreKey, error)
+	Converter func(v1alpha1.StoreKey) (*v1alpha1.StoreKey, error)
 }
 
 // Validate validates a Request.
@@ -68,7 +76,7 @@ type Response struct {
 //     -- Filter list by checking for keys that satisfy at least one regex filter
 //     -- Mark all list keys that match filters to sync
 //   - Sync each key in a separate goroutine
-//     -- If Request.SetConverter is supplied, apply on key before API Set
+//     -- If Request.Converter is supplied, apply on key before API Set
 //   - Return Response with aggregated sync details
 func Sync(ctx context.Context, req Request) (*Response, error) {
 	// Validate
@@ -95,7 +103,7 @@ func Sync(ctx context.Context, req Request) (*Response, error) {
 		go func(key v1alpha1.StoreKey) {
 			defer wg.Done()
 
-			destKey, err := syncKey(ctx, key, req.Source, req.Dest, req.SetConverter)
+			destKey, err := syncKey(ctx, key, req.Source, req.Dest, req.Converter)
 			if err != nil {
 				if err == v1alpha1.ErrStoreKeyNotFound { // not found, soft warn
 					logrus.Warnf("Skipped syncing key '%s', reason: %v", key.Key, err)
@@ -113,14 +121,11 @@ func Sync(ctx context.Context, req Request) (*Response, error) {
 
 	// Return response
 	synced, total := int32(syncCount.Load()), int32(len(syncKeys))
-	if synced == 0 && total > 0 {
-		return nil, fmt.Errorf("no keys were synced, expected %d", total)
-	}
 	return &Response{
 		Total:    total,
 		Synced:   synced,
 		Success:  total == synced,
-		Status:   fmt.Sprintf("Synced %d out of total %d", synced, total),
+		Status:   fmt.Sprintf("Synced %d out of total %d keys", synced, total),
 		SyncedAt: time.Now(),
 	}, nil
 }

@@ -1,4 +1,4 @@
 permissions: ReadWrite
 provider:
   file:
-    dir-path: "/tmp/store-dest"
+    dir-path: "/tmp/file-dest"

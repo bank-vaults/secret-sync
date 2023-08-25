@@ -1,0 +1,4 @@
+permissions: ReadWrite
+provider:
+  file:
+    dir-path: "/tmp/file-source"

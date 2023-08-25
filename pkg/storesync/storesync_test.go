@@ -44,11 +44,11 @@ func TestSync(t *testing.T) {
 	// dest := createVaultStore(t, "http://0.0.0.0:8201", "root")
 	expected := convertKeys("a", "b/b", "c/c/c", "d/d/d/0", "d/d/d/1", "d/d/d/2", "d/d/d/d/d")
 	request := storesync.Request{
-		Source:       source,
-		Dest:         dest,
-		Keys:         convertKeys("a", "b/b", "c/c/c"),
-		ListFilters:  convertFilters("d/d/d"),
-		SetConverter: destConverter,
+		Source:      source,
+		Dest:        dest,
+		Keys:        convertKeys("a", "b/b", "c/c/c"),
+		ListFilters: convertFilters("d/d/d"),
+		Converter:   destConverter,
 	}
 
 	// Init source store
@@ -62,7 +62,7 @@ func TestSync(t *testing.T) {
 	assert.Equal(t, true, resp.Success)
 	assert.Equal(t, true, resp.Synced > 0)
 	for _, key := range expected {
-		newKey, _ := request.SetConverter(key)
+		newKey, _ := request.Converter(key)
 		gotVal, err := dest.GetSecret(testCtx, *newKey)
 		assert.Nil(t, err)
 		assert.Equal(t, []byte(key.Key), gotVal)
