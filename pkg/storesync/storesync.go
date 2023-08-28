@@ -11,134 +11,149 @@ import (
 	"time"
 )
 
-// Request defines request data to use when performing Sync to synchronize data
-// from Source to Dest.
-type Request struct {
-	// Source defines the store from which the keys will be fetched. All keys
-	// specified by Keys and keys that match ListFilters listed from Source will be
-	// fetched via Source.GetSecret.
-	// Required
-	Source v1alpha1.StoreReader
-
-	// Dest defines destination of fetched secrets. If Converter is present, then
-	// keys will be converted before performing Dest.SetSecret.
-	// Required
-	Dest v1alpha1.StoreWriter
-
-	// Keys defines which keys to sync will be added to sync queue.
-	// Optional
-	Keys []v1alpha1.StoreKey
-
-	// ListFilters defines a list of regex filters that will be applied on results of
-	// Source ListSecretKeys method. A key from the response will be added to sync
-	// queue if it matches at least one filter.
-	// Optional
-	ListFilters []*regexp.Regexp
-
-	// Converter defines the function that will be called on every key before
-	// being sent to Dest. It is used to dynamically change request key data for dest.
-	// For example, when needed to add suffix to key.
-	// Optional
-	Converter func(v1alpha1.StoreKey) (*v1alpha1.StoreKey, error)
+// syncRequest defines data required to perform a key sync.
+// This is the minimal unit of work for full v1alpha1.SecretKey sync.
+type syncRequest struct {
+	SecretKey v1alpha1.SecretKey
+	Rewrite   []v1alpha1.SecretKeyRewrite
 }
 
-// Validate validates a Request.
-func (req *Request) Validate() error {
-	if req.Source == nil {
-		return fmt.Errorf("source is nil")
-	}
-	if req.Dest == nil {
-		return fmt.Errorf("dest is nil")
-	}
-	if len(req.Keys) == 0 && len(req.ListFilters) == 0 {
-		return fmt.Errorf("both Keys and ListFilters are empty, at least one required")
-	}
-
-	return nil
-}
-
-// Response defines response data returned by Sync.
-type Response struct {
-	Total    int32     //  total number of keys marked for sync
-	Synced   int32     //  number of successful syncs
+// Status defines response data returned by Sync.
+type Status struct {
+	Total    uint32    //  total number of keys marked for sync
+	Synced   uint32    //  number of successful syncs
 	Success  bool      //  if Sync was successful
 	Status   string    //  an arbitrary status message
 	SyncedAt time.Time //  completion timestamp
 }
 
-// Sync will synchronize data between source and dest based on provided
-// request params.
-//
-// Overview:
-//   - Mark all Request.Keys for sync
-//   - If Request.ListFilters supplied:
-//     -- List all keys on Request.Source
-//     -- Filter list by checking for keys that satisfy at least one regex filter
-//     -- Mark all list keys that match filters to sync
-//   - Sync each key in a separate goroutine
-//     -- If Request.Converter is supplied, apply on key before API Set
-//   - Return Response with aggregated sync details
-func Sync(ctx context.Context, req Request) (*Response, error) {
+// Sync will synchronize keys from source to dest based on provided specs.
+func Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, refs []v1alpha1.SecretKeyFromRef) (*Status, error) {
 	// Validate
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("sync request validation failed: %w", err)
+	if source == nil {
+		return nil, fmt.Errorf("source is nil")
+	}
+	if dest == nil {
+		return nil, fmt.Errorf("dest is nil")
+	}
+	if len(refs) == 0 {
+		return nil, fmt.Errorf("no sync data")
 	}
 
-	// Fetch filtered list keys from source
-	filteredList, err := getFilteredListKeys(ctx, req.Source, req.ListFilters)
-	if err != nil {
-		logrus.Errorf("Failed to list keys, reason: %v", err)
-	} else if len(filteredList) > 0 {
-		logrus.Infof("Found %d keys that match list filters", len(filteredList))
-	}
+	// All sync requests will be concurrently sent to this channel
+	syncQueue := make(chan syncRequest, 1)
 
-	// Sync requested and filtered keys between source and dest.
-	// Do sync for each key in a separate goroutine.
-	wg := sync.WaitGroup{}
-	syncCount := atomic.Uint32{}
-	syncKeys := removeDuplicates(append(req.Keys, filteredList...))
-	logrus.Infof("Synchronizing %d keys...", len(syncKeys))
-	for _, key := range syncKeys {
-		wg.Add(1)
-		go func(key v1alpha1.StoreKey) {
-			defer wg.Done()
+	// Fetch keys based on ref params and add them to sync queue.
+	// Do each fetch in a separate goroutine (there could be API requests).
+	{
+		extractWg := sync.WaitGroup{}
+		for i := range refs {
+			extractWg.Add(1)
+			go func(ref v1alpha1.SecretKeyFromRef) {
+				defer extractWg.Done()
 
-			destKey, err := syncKey(ctx, key, req.Source, req.Dest, req.Converter)
-			if err != nil {
-				if err == v1alpha1.ErrStoreKeyNotFound { // not found, soft warn
-					logrus.Warnf("Skipped syncing key '%s', reason: %v", key.Key, err)
-				} else { // otherwise, log error
-					logrus.Errorf("Failed to sync key '%s', reason: %v", key.Key, err)
+				// Fetch keys
+				secretKeys, err := getKeys(ctx, source, ref)
+				if err != nil {
+					logrus.Warnf("Failed to extract keys, reason: %v", err)
 				}
-				return
-			}
 
-			logrus.Infof("Successfully synced key '%s' to '%s'", key.Key, destKey.Key)
-			syncCount.Add(1)
-		}(key)
+				// Submit keys for sync
+				for i := range secretKeys {
+					syncQueue <- syncRequest{
+						SecretKey: secretKeys[i], // use fetched key
+						Rewrite:   ref.Rewrite,   // use same rewrite
+					}
+				}
+			}(refs[i])
+		}
+
+		// Close sync request channel when everything has been extracted to stop the loop
+		go func() {
+			extractWg.Wait()
+			close(syncQueue)
+		}()
 	}
-	wg.Wait()
+
+	// Sync keys between source and dest read from sync queue.
+	// Do sync for each key in a separate goroutine (there will be API requests).
+	var totalCount uint32
+	var successCounter atomic.Uint32
+	{
+		syncWg := sync.WaitGroup{}
+		syncKeyMap := make(map[string]bool)
+		for req := range syncQueue {
+			// Check if the key has already been synced
+			if _, exists := syncKeyMap[req.SecretKey.Key]; exists {
+				continue
+			}
+			syncKeyMap[req.SecretKey.Key] = true
+			totalCount++
+
+			// Sync key in a separate goroutine
+			syncWg.Add(1)
+			go func(req syncRequest) {
+				defer syncWg.Done()
+
+				key := req.SecretKey
+				destKey, err := doRequest(ctx, source, dest, req)
+				if err != nil {
+					if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
+						logrus.Warnf("Skipped syncing key '%s', reason: %v", key.Key, err)
+					} else { // otherwise, log error
+						logrus.Errorf("Failed to sync key '%s', reason: %v", key.Key, err)
+					}
+					return
+				}
+
+				logrus.Infof("Successfully synced key '%s' to '%s'", key.Key, destKey.Key)
+				successCounter.Add(1)
+			}(req)
+		}
+		syncWg.Wait()
+	}
 
 	// Return response
-	synced, total := int32(syncCount.Load()), int32(len(syncKeys))
-	return &Response{
-		Total:    total,
-		Synced:   synced,
-		Success:  total == synced,
-		Status:   fmt.Sprintf("Synced %d out of total %d keys", synced, total),
+	successCount := successCounter.Load()
+	return &Status{
+		Total:    totalCount,
+		Synced:   successCount,
+		Success:  totalCount == successCount,
+		Status:   fmt.Sprintf("Synced %d out of total %d keys", successCount, totalCount),
 		SyncedAt: time.Now(),
 	}, nil
 }
 
-// syncKey synchronizes a specific key from source to dest. Returns key synced to dest.
-func syncKey(
-	ctx context.Context,
-	key v1alpha1.StoreKey,
-	source v1alpha1.StoreReader,
-	dest v1alpha1.StoreWriter,
-	converter func(v1alpha1.StoreKey) (*v1alpha1.StoreKey, error),
-) (v1alpha1.StoreKey, error) {
-	// Get
+// getKeys fetches (one or multiple) v1alpha1.SecretKey for a single v1alpha1.SecretKeyFromRef.
+// Performs an API list request on source if ref Query is specified to get multiple v1alpha1.SecretKey.
+func getKeys(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.SecretKeyFromRef) ([]v1alpha1.SecretKey, error) {
+	// Validate
+	if ref.SecretKey == nil && ref.Query == nil {
+		return nil, fmt.Errorf("both SecretKey and Query are empty, at least one required")
+	}
+
+	// Get keys
+	var keys []v1alpha1.SecretKey
+	if ref.SecretKey != nil {
+		// Add static key
+		keys = append(keys, *ref.SecretKey)
+	}
+	if ref.Query != nil {
+		// Get keys from API
+		listKeys, err := source.ListSecretKeys(ctx, *ref.Query)
+		if err != nil {
+			return nil, fmt.Errorf("failed while doing query %v: %w", *ref.Query, err)
+		}
+		keys = append(listKeys, keys...)
+	}
+
+	return keys, nil
+}
+
+// doRequest will sync a given syncRequest from source to dest. Returns key that was synced to dest or error.
+func doRequest(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, req syncRequest) (v1alpha1.SecretKey, error) {
+	// Get from source
+	key := req.SecretKey
 	value, err := source.GetSecret(ctx, key)
 	if err != nil {
 		return key, err
@@ -147,61 +162,34 @@ func syncKey(
 	// TODO: Consider adding a check to see if the secret needs to be updated.
 	// TODO: This adds additional option to Sync CRD => skip API set if get didn't change since last time
 
-	// Convert key before writing to dest
-	if converter != nil {
-		newKey, err := converter(key)
-		if err != nil {
-			return key, err
-		}
-		key = *newKey
-	}
-
-	// Set
-	err = dest.SetSecret(ctx, key, value)
+	// Rewrite before writing to dest
+	updatedKey, err := applyRewrites(key, req.Rewrite)
 	if err != nil {
 		return key, err
 	}
 
-	return key, err
-}
-
-// getFilteredListKeys returns keys listed from v1alpha1.StoreReader that match
-// any of the provided regex filters. Returns nil slice for empty keyFilters.
-func getFilteredListKeys(ctx context.Context, source v1alpha1.StoreReader, filters []*regexp.Regexp) ([]v1alpha1.StoreKey, error) {
-	// Skip on no filters
-	if len(filters) == 0 {
-		return nil, nil
-	}
-
-	// List
-	listKeys, err := source.ListSecretKeys(ctx)
+	// Set to dest
+	err = dest.SetSecret(ctx, updatedKey, value)
 	if err != nil {
-		return nil, err
+		return updatedKey, err
 	}
 
-	// Filter
-	var filteredKeys []v1alpha1.StoreKey
-	for _, listKey := range listKeys {
-		for _, filter := range filters {
-			if filter.MatchString(listKey.Key) {
-				filteredKeys = append(filteredKeys, listKey)
-				break
-			}
-		}
-	}
-
-	return filteredKeys, nil
+	return updatedKey, nil
 }
 
-// removeDuplicates returns v1alpha1.StoreKey slice without duplicates.
-func removeDuplicates(keys []v1alpha1.StoreKey) []v1alpha1.StoreKey {
-	uniqueKeys := make(map[string]bool)
-	results := make([]v1alpha1.StoreKey, 0, len(keys))
-	for _, key := range keys {
-		if _, exists := uniqueKeys[key.Key]; !exists {
-			uniqueKeys[key.Key] = true
-			results = append(results, key)
+// applyRewrites applies rewrites to v1alpha1.SecretKey and returns updated key or error.
+func applyRewrites(secretKey v1alpha1.SecretKey, rewrites []v1alpha1.SecretKeyRewrite) (v1alpha1.SecretKey, error) {
+	for _, rewrite := range rewrites {
+		// Update Regexp field
+		keyRegex := rewrite.Regexp
+		if keyRegex == nil {
+			continue
 		}
+		keyGroup, err := regexp.Compile(keyRegex.Source)
+		if err != nil {
+			return secretKey, fmt.Errorf("failed to compile regex %s: %w", keyRegex.Source, err)
+		}
+		secretKey.Key = keyGroup.ReplaceAllString(secretKey.Key, keyRegex.Target)
 	}
-	return results
+	return secretKey, nil
 }

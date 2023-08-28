@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
-	"regexp"
 	"testing"
 )
 
@@ -17,16 +16,14 @@ func BenchmarkSync(b *testing.B) {
 	b.ReportAllocs()
 
 	// Prepare
+	source := &fakeClient{}
+	dest := &fakeClient{}
+	requests := refKeys("a", "b/b", "c/c/c")
 	logrus.SetOutput(io.Discard)
-	request := storesync.Request{
-		Source: &fakeClient{},
-		Dest:   &fakeClient{},
-		Keys:   convertKeys("a", "b/b", "c/c/c"),
-	}
 
 	// Run
 	for i := 0; i < b.N; i++ {
-		_, _ = storesync.Sync(context.Background(), request)
+		_, _ = storesync.Sync(context.Background(), source, dest, requests)
 	}
 }
 
@@ -36,61 +33,69 @@ func TestSync(t *testing.T) {
 	// Define sync data
 	source := createFileStore(t, "from-dir")
 	dest := createFileStore(t, "to-dir")
-	destConverter := func(key v1alpha1.StoreKey) (*v1alpha1.StoreKey, error) {
-		key.Key = key.Key + "/suffix"
-		return &key, nil
-	}
 	// source := createVaultStore(t, "http://0.0.0.0:8200", "root")
 	// dest := createVaultStore(t, "http://0.0.0.0:8201", "root")
-	expected := convertKeys("a", "b/b", "c/c/c", "d/d/d/0", "d/d/d/1", "d/d/d/2", "d/d/d/d/d")
-	request := storesync.Request{
-		Source:      source,
-		Dest:        dest,
-		Keys:        convertKeys("a", "b/b", "c/c/c"),
-		ListFilters: convertFilters("d/d/d"),
-		Converter:   destConverter,
-	}
+
+	expected := fromKeys("a", "b/b", "c/c/c", "d/d/d/0", "d/d/d/1", "d/d/d/2", "d/d/d/d")
+	requests := append(
+		refKeys("a", "b/b", "c/c/c"),
+		refFilter("d/d/d", ".*"),
+	)
 
 	// Init source store
 	initStore(t, source, expected)
 
 	// Sync
-	resp, err := storesync.Sync(testCtx, request)
+	resp, err := storesync.Sync(testCtx, source, dest, requests)
 	assert.Nil(t, err)
 
 	// Validate that dest is synced
 	assert.Equal(t, true, resp.Success)
 	assert.Equal(t, true, resp.Synced > 0)
 	for _, key := range expected {
-		newKey, _ := request.Converter(key)
-		gotVal, err := dest.GetSecret(testCtx, *newKey)
-		assert.Nil(t, err)
-		assert.Equal(t, []byte(key.Key), gotVal)
+		gotVal, err := dest.GetSecret(testCtx, key)
+		assert.Nil(t, err, key)
+		assert.Equal(t, []byte(key.Key), gotVal, key)
 	}
 }
 
-func initStore(t *testing.T, store v1alpha1.StoreClient, keyData []v1alpha1.StoreKey) {
-	for _, keyReq := range keyData {
-		assert.Nil(t, store.SetSecret(context.Background(), keyReq, []byte(keyReq.Key)))
-	}
-}
-
-func convertKeys(keys ...string) []v1alpha1.StoreKey {
-	result := make([]v1alpha1.StoreKey, 0)
+func initStore(t *testing.T, store v1alpha1.StoreClient, keys []v1alpha1.SecretKey) {
 	for _, key := range keys {
-		result = append(result, v1alpha1.StoreKey{
+		assert.Nil(t, store.SetSecret(context.Background(), key, []byte(key.Key)))
+	}
+}
+
+func fromKeys(keys ...string) []v1alpha1.SecretKey {
+	result := make([]v1alpha1.SecretKey, 0)
+	for _, key := range keys {
+		result = append(result, v1alpha1.SecretKey{
 			Key: key,
 		})
 	}
 	return result
 }
 
-func convertFilters(filters ...string) []*regexp.Regexp {
-	result := make([]*regexp.Regexp, 0)
-	for _, filter := range filters {
-		result = append(result, regexp.MustCompile(filter))
+func refKeys(keys ...string) []v1alpha1.SecretKeyFromRef {
+	result := make([]v1alpha1.SecretKeyFromRef, 0)
+	for _, key := range keys {
+		result = append(result, v1alpha1.SecretKeyFromRef{
+			SecretKey: &v1alpha1.SecretKey{
+				Key: key,
+			},
+		})
 	}
 	return result
+}
+
+func refFilter(path string, filter string) v1alpha1.SecretKeyFromRef {
+	return v1alpha1.SecretKeyFromRef{
+		Query: &v1alpha1.SecretKeyQuery{
+			Path: &path,
+			Key: &v1alpha1.RegexpQuery{
+				Regexp: filter,
+			},
+		},
+	}
 }
 
 func createFileStore(t *testing.T, name string) v1alpha1.StoreClient {
@@ -122,14 +127,14 @@ func createVaultStore(t *testing.T, addr, token string) v1alpha1.StoreClient {
 
 type fakeClient struct{}
 
-func (c *fakeClient) GetSecret(_ context.Context, key v1alpha1.StoreKey) ([]byte, error) {
+func (c *fakeClient) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, error) {
 	return []byte(""), nil
 }
 
-func (c *fakeClient) ListSecretKeys(_ context.Context) ([]v1alpha1.StoreKey, error) {
-	return []v1alpha1.StoreKey{{}, {}}, nil
+func (c *fakeClient) ListSecretKeys(_ context.Context, _ v1alpha1.SecretKeyQuery) ([]v1alpha1.SecretKey, error) {
+	return []v1alpha1.SecretKey{{}, {}}, nil
 }
 
-func (c *fakeClient) SetSecret(_ context.Context, key v1alpha1.StoreKey, value []byte) error {
+func (c *fakeClient) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []byte) error {
 	return nil
 }

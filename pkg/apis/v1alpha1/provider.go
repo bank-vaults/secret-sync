@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-var ErrStoreKeyNotFound = errors.New("secret key not found")
+var ErrKeyNotFound = errors.New("secret key not found")
 
 // Provider defines methods to manage store clients.
 type Provider interface {
@@ -16,19 +16,19 @@ type Provider interface {
 	Validate(backend SecretStoreProvider) error
 }
 
-// StoreReader implements read ops for a secret backend.
+// StoreReader implements read ops for a secret backend. Must support concurrent calls.
 type StoreReader interface {
 	// GetSecret returns a single secret fetched from secret store.
-	GetSecret(ctx context.Context, key StoreKey) ([]byte, error)
+	GetSecret(ctx context.Context, key SecretKey) ([]byte, error)
 
-	// ListSecretKeys lists all keys for the current secret store.
-	ListSecretKeys(ctx context.Context) ([]StoreKey, error)
+	// ListSecretKeys lists all keys matching the query from secret store.
+	ListSecretKeys(ctx context.Context, query SecretKeyQuery) ([]SecretKey, error)
 }
 
-// StoreWriter implements write ops for a secret backend.
+// StoreWriter implements write ops for a secret backend. Must support concurrent calls.
 type StoreWriter interface {
 	// SetSecret writes data to a key in a secret store.
-	SetSecret(ctx context.Context, key StoreKey, value []byte) error
+	SetSecret(ctx context.Context, key SecretKey, value []byte) error
 }
 
 // StoreClient unifies read and write ops for a specific secret backend.

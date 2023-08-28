@@ -4,13 +4,17 @@ import "strings"
 
 var DefaultSecretStorePermissions = SecretStorePermissionsReadWrite
 
-// SecretStoreRef defines a reference to a SecretStore.
 type SecretStoreRef struct {
-	// Name points to a name of a resource.
-	Name string `json:"name,omitempty"`
+	// Name of the SecretStore resource
+	Name string `json:"name"`
 
-	// Namespace points to a namespace of a resource.
+	// Namespace of the SecretStore resource.
+	// Optional
 	Namespace string `json:"namespace,omitempty"`
+
+	// Kind of the SecretStore resource (SecretStore, ClusterSecretStore).
+	// Optional
+	Kind string `json:"kind,omitempty"`
 }
 
 // SecretStoreSpec defines an arbitrary SecretStore spec.
@@ -43,7 +47,7 @@ func (p SecretStorePermissions) CanPerform(perm SecretStorePermissions) bool {
 	return strings.Contains(string(p), string(perm))
 }
 
-// SecretStoreProvider defines which store provider to use.
+// SecretStoreProvider defines secret backend for Provider.
 // Only one can be specified.
 type SecretStoreProvider struct {
 	// Used for Vault provider.
