@@ -1,0 +1,5 @@
+permissions: ReadWrite
+provider:
+  kubernetes:
+    namespace: "default"
+    config-path: "kubeconfig.yaml"

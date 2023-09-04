@@ -54,6 +54,9 @@ type SecretStoreProvider struct {
 	// Used for Vault provider.
 	Vault *SecretStoreProviderVault `json:"vault,omitempty"`
 
+	// Used for Kubernetes provider.
+	Kubernetes *SecretStoreProviderKubernetes `json:"kubernetes,omitempty"`
+
 	// Used for non-encrypted File provider.
 	File *SecretStoreProviderFile `json:"file,omitempty"`
 }

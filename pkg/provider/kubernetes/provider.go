@@ -12,57 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package vault
+package kubernetes
 
 import (
 	"context"
 	"fmt"
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
-	"github.com/bank-vaults/vault-sdk/vault"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Provider struct{}
 
 func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreProvider) (v1alpha1.StoreClient, error) {
-	providerCfg := backend.Vault
-	apiClient, err := vault.NewClientWithOptions(
-		vault.ClientURL(providerCfg.Address),
-		vault.ClientRole(providerCfg.Role),
-		vault.ClientAuthPath(providerCfg.AuthPath),
-		vault.ClientTokenPath(providerCfg.TokenPath),
-		vault.ClientToken(providerCfg.Token))
+	providerCfg := backend.Kubernetes
+	kubeConfig, err := clientcmd.BuildConfigFromFlags("", providerCfg.ConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vault client: %w", err)
+		return nil, fmt.Errorf("failed to build kube config: %w", err)
+	}
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build kube client: %w", err)
 	}
 
 	return &client{
-		apiClient:  apiClient,
-		apiKeyPath: providerCfg.UnsealKeysPath,
+		namespace:     providerCfg.Namespace,
+		secretsClient: kubeClient.CoreV1().Secrets(providerCfg.Namespace),
 	}, nil
 }
 
 func (p *Provider) Validate(backend v1alpha1.SecretStoreProvider) error {
-	providerCfg := backend.Vault
+	providerCfg := backend.Kubernetes
 	if providerCfg == nil {
-		return fmt.Errorf("empty Vault config")
+		return fmt.Errorf("empty Kubernetes config")
 	}
-	if providerCfg.Address == "" {
-		return fmt.Errorf("empty .Vault.Address")
+	if providerCfg.ConfigPath == "" {
+		return fmt.Errorf("empty .Kubernetes.ConfigPath")
 	}
-	if providerCfg.UnsealKeysPath == "" {
-		return fmt.Errorf("empty .Vault.UnsealKeysPath")
-	}
-	if providerCfg.AuthPath == "" {
-		return fmt.Errorf("empty .Vault.AuthPath")
-	}
-	if providerCfg.Token == "" {
-		return fmt.Errorf("empty .Vault.Token")
+	if providerCfg.Namespace == "" {
+		return fmt.Errorf("empty .Kubernetes.Namespace")
 	}
 	return nil
 }
 
 func init() {
 	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreProvider{
-		Vault: &v1alpha1.SecretStoreProviderVault{},
+		Kubernetes: &v1alpha1.SecretStoreProviderKubernetes{},
 	})
 }

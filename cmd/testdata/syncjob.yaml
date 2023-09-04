@@ -1,12 +1,3 @@
-## Used to configure schedule for synchronization.
-## The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
-schedule: "@daily"
-
-## Used to only perform sync once.
-## If specified, Schedule will be ignored.
-run-once: false
-
-## Used to specify overall sync plan between source and dest
 plan:
   - secret:
       key: a
@@ -22,6 +13,3 @@ plan:
       - regexp:
           source: "d/d/d/(.*)"
           target: "d/d/d/$1-final"
-
-## Points to a file where all sync logs should be saved to.
-audit-log-path: "path/to/file"
