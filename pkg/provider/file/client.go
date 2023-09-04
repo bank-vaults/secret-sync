@@ -79,5 +79,5 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []by
 }
 
 func pathForKey(key v1alpha1.SecretKey) string {
-	return filepath.Join(append(key.GetPath(), key.GetProperty())...)
+	return filepath.Join(append(key.GetPath(), key.GetKey())...)
 }

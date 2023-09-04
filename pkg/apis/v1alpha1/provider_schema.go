@@ -64,17 +64,16 @@ func getProviderName(backend *SecretStoreProvider) (string, error) {
 	if backend == nil {
 		return "", fmt.Errorf("no StoreConfig provided")
 	}
-	nilKey, nonNilCount := "", 0
+	nonNilKey, nonNilCount := "", 0
 	v := reflect.ValueOf(*backend)
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).IsNil() {
-			nilKey = v.Type().Field(i).Name
-		} else {
+		if !v.Field(i).IsNil() {
+			nonNilKey = v.Type().Field(i).Name
 			nonNilCount++
 		}
 	}
 	if nonNilCount != 1 {
 		return "", fmt.Errorf("only one store backend required for StoreConfig, found %d", nonNilCount)
 	}
-	return nilKey, nil
+	return nonNilKey, nil
 }

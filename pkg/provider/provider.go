@@ -21,6 +21,7 @@ import (
 
 	// Register providers
 	_ "github.com/bank-vaults/secret-sync/pkg/provider/file"
+	_ "github.com/bank-vaults/secret-sync/pkg/provider/kubernetes"
 	_ "github.com/bank-vaults/secret-sync/pkg/provider/vault"
 )
 

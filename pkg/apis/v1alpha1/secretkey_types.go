@@ -14,15 +14,26 @@
 
 package v1alpha1
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
+
+var ErrKeyPathUnsupported = fmt.Errorf("provider does not support secret keys with path")
 
 // SecretKey defines Provider key params.
 // TODO: Add support for different encodings (to decode when fetching).
 type SecretKey struct {
 	// Key points to a specific key in store.
-	// Format "path/to/key"
+	// Accepted formats: "key", "path/to/key".
+	// Some Provider do not support "path/to/key" and will throw ErrKeyPathUnsupported.
 	// Required
 	Key string `json:"key"`
+
+	// Property selects a specific map property of the Provider value.
+	// TODO: Add support on providers
+	// Optional
+	Property string `json:"property,omitempty"`
 
 	// Version points to specific key version.
 	// TODO: Add support on providers
@@ -39,8 +50,8 @@ func (key *SecretKey) GetPath() []string {
 	return parts[:len(parts)-1]
 }
 
-// GetProperty returns property (domain) pointed by Key, e.g. GetProperty("path/to/key") returns "key"
-func (key *SecretKey) GetProperty() string {
+// GetKey returns base key pointed by Key, e.g. GetKey("path/to/key") returns "key"
+func (key *SecretKey) GetKey() string {
 	parts := strings.Split(key.Key, "/")
 	if len(parts) == 0 {
 		return key.Key

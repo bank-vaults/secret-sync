@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -45,10 +46,12 @@ func TestSync(t *testing.T) {
 	testCtx := context.Background()
 
 	// Define sync data
-	source := createFileStore(t, "from-dir")
-	dest := createFileStore(t, "to-dir")
-	_ = createVaultStore(t, "http://0.0.0.0:8200", "root")
-	_ = createVaultStore(t, "http://0.0.0.0:8201", "root")
+	//source := createFileStore(t, "from-dir")
+	//dest := createFileStore(t, "to-dir")
+	//source := createVaultStore(t, "http://0.0.0.0:8200", "root")
+	//dest := createVaultStore(t, "http://0.0.0.0:8201", "root")
+	source := createKubernetesStore(t, "from")
+	dest := createKubernetesStore(t, "to")
 
 	expected := fromKeys("a", "b/b", "c/c/c", "d/d/d/0", "d/d/d/1", "d/d/d/2", "d/d/d/d")
 	requests := append(
@@ -133,6 +136,19 @@ func createVaultStore(t *testing.T, addr, token string) v1alpha1.StoreClient {
 			UnsealKeysPath: "secret",
 			AuthPath:       "userpass",
 			Token:          token,
+		},
+	})
+	assert.Nil(t, err)
+	return client
+}
+
+func createKubernetesStore(t *testing.T, namespace string) v1alpha1.StoreClient {
+	dirname, err := os.UserHomeDir()
+	assert.Nil(t, err)
+	client, err := provider.NewClient(context.Background(), &v1alpha1.SecretStoreProvider{
+		Kubernetes: &v1alpha1.SecretStoreProviderKubernetes{
+			Namespace:  namespace,
+			ConfigPath: filepath.Join(dirname, ".kube", "config"),
 		},
 	})
 	assert.Nil(t, err)

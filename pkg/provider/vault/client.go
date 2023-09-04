@@ -51,7 +51,7 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, e
 	}
 
 	// Get property
-	property := key.GetProperty()
+	property := key.GetKey()
 	propertyData, ok := data[property]
 	if !ok {
 		return nil, fmt.Errorf("could not find property %s for in get response", property)
@@ -108,7 +108,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []by
 		fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath),
 		map[string]interface{}{
 			"data": map[string]interface{}{
-				key.GetProperty(): value,
+				key.GetKey(): value,
 			},
 		},
 	)
@@ -170,5 +170,5 @@ func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.Sec
 }
 
 func pathForKey(key v1alpha1.SecretKey) string {
-	return strings.Join(append(key.GetPath(), key.GetProperty()), "/")
+	return strings.Join(append(key.GetPath(), key.GetKey()), "/")
 }
