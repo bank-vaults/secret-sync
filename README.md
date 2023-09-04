@@ -19,12 +19,12 @@ Synchronize secrets every hour from Vault-A to Vault-B instance.
 permissions: Read
 provider:
   vault:
-    address: http://0.0.0.0:8200
-    unseal-keys-path: secret
-    role: ''
-    auth-path: userpass
-    token-path: ''
-    token: root
+    address: "http://0.0.0.0:8200"
+    unseal-keys-path: "secret"
+    role: ""
+    auth-path: "userpass"
+    token-path: ""
+    token: "root"
 ```
 ```yaml
 ### Vault-B - Dest
@@ -32,27 +32,27 @@ provider:
 permissions: Write
 provider:
   vault:
-    address: http://0.0.0.0:8201
-    unseal-keys-path: secret
-    role: ''
-    auth-path: userpass
-    token-path: ''
-    token: root
+    address: "http://0.0.0.0:8201"
+    unseal-keys-path: "secret"
+    role: ""
+    auth-path: "userpass"
+    token-path: ""
+    token: "root"
 ```
 ```yaml
 ### SyncJob: path/to/sync-job.yaml
 schedule: "@every 1h"
 plan:
   - secret:
-      key: a
+      key: "a"
   - secret:
-      key: b/b
+      key: "b/b"
   - secret:
-      key: c/c/cÏ
+      key: "c/c/c"
   - query:
       path: "d/d/d"
       key:
-        regexp: .*
+        regexp: ".*"
     key-transform:
       - regexp:
           source: "d/d/d/(.*)"
