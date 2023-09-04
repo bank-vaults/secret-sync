@@ -1,3 +1,17 @@
+// Copyright © 2023 Cisco
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package v1alpha1
 
 import "strings"
@@ -11,6 +25,7 @@ type SecretKey struct {
 	Key string `json:"key"`
 
 	// Version points to specific key version.
+	// TODO: Add support on providers
 	// Optional
 	Version string `json:"version"`
 }
@@ -45,13 +60,12 @@ type SecretKeyFromRef struct {
 	// Optional
 	Query *SecretKeyQuery `json:"query,omitempty"`
 
-	// Used to rewrite secret keys after getting them from the Provider.
-	// Multiple Rewrite operations will be applied in FIFO order.
+	// Used to transform secret keys after getting them from the Provider.
+	// Multiple KeyTransform operations will be applied in FIFO order.
 	// Optional
-	Rewrite []SecretKeyRewrite `json:"rewrite,omitempty"`
+	KeyTransform []SecretKeyTransform `json:"key-transform,omitempty"`
 }
 
-// SecretKeyQuery defines how to query SecretKey.
 type SecretKeyQuery struct {
 	// A root path to start the find operations.
 	// Optional
@@ -62,21 +76,17 @@ type SecretKeyQuery struct {
 	Key *RegexpQuery `json:"key,omitempty"`
 }
 
-// SecretKeyRewrite defines how to rewrite SecretKey.
-type SecretKeyRewrite struct {
-	// Used to rewrite SecretKey with regular expressions.
+type SecretKeyTransform struct {
+	// Used to transform SecretKey with regular expressions.
 	// The resulting SecretKey will be the output of a regexp.ReplaceAll operation.
-	Regexp *RegexpRewrite `json:"regexp,omitempty"`
+	Regexp *RegexpTransform `json:"regexp,omitempty"`
 }
 
 type RegexpQuery struct {
 	Regexp string `json:"regexp,omitempty"`
 }
 
-type RegexpRewrite struct {
-	// TODO: Add a way to specify reference field (e.g. Version, Regexp, ...)
-	// TODO: For now, only Key is updated
-
+type RegexpTransform struct {
 	// Used to define the regular expression of a re.Compiler.
 	Source string `json:"source"`
 

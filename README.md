@@ -2,11 +2,17 @@
 
 Enables secret synchronization between two secret store services (e.g. between Vault and AWS) in a configurable manner.
 
+> [!WARNING]  
+> This is an early alpha version and there will be changes made to the API. You can support us with your feedback.
+
 ### Supported secret stores
 - Vault
+- FileDir (regular system directory)
 
 ### Quick usage
 Synchronize secrets every hour from Vault-A to Vault-B instance.
+
+#### Define stores and sync job strategy
 ```yaml
 ### Vault-A - Source
 ### SecretStore: path/to/vault-source.yaml
@@ -39,29 +45,21 @@ schedule: "@every 1h"
 plan:
   - secret:
       key: a
-    rewrite:
-      - regexp:
-          source: "a"
-          target: "a-transient"
-      - regexp:
-          source: "a-transient"
-          target: "a-final"
   - secret:
       key: b/b
-      version: "1"
   - secret:
-      key: c/c/c
-      version: "2"
+      key: c/c/cÏ
   - query:
       path: "d/d/d"
       key:
         regexp: .*
-    rewrite:
+    key-transform:
       - regexp:
-          source: "d/d/d/1"
-          target: "d/d/d/1-final"
+          source: "d/d/d/(.*)"
+          target: "d/d/d/$1-final"
 ```
 
+#### Perform sync
 ```bash
 secret-sync --source path/to/vault-source.yaml \
             --dest path/to/vault-dest.yaml \
@@ -70,4 +68,4 @@ secret-sync --source path/to/vault-source.yaml \
 ```
 
 ### Docs
-Check documentation and example usage at [PROPOSAL](docs/proposal.md#Example_usage).
+Check documentation and example usage at [PROPOSAL](docs/proposal.md).

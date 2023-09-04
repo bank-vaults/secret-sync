@@ -1,15 +1,3 @@
-## Used to configure the source for sync request.
-## Currently loaded from a file.
-# source:
-#   name:
-#   namespace:
-
-## Used to configure the destination of sync request.
-## Currently loaded from a file.
-# dest:
-#   name:
-#   namespace:
-
 ## Used to configure schedule for synchronization.
 ## The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
 schedule: "@daily"
@@ -18,34 +6,22 @@ schedule: "@daily"
 ## If specified, Schedule will be ignored.
 run-once: false
 
-## Used to specify which da
+## Used to specify overall sync plan between source and dest
 plan:
   - secret:
       key: a
-    rewrite:
-      - regexp:
-          source: "a"
-          target: "a-transient"
-      - regexp:
-          source: "a-transient"
-          target: "a-final"
   - secret:
       key: b/b
-      version: "1"
   - secret:
       key: c/c/c
-      version: "2"
   - query:
       path: "d/d/d"
       key:
         regexp: .*
-    rewrite:
+    key-transform:
       - regexp:
-          source: "d/d/d/1"
-          target: "d/d/d/1-final"
-
-## The number of latest sync results to retain in-memory.
-history-limit: 128
+          source: "d/d/d/(.*)"
+          target: "d/d/d/$1-final"
 
 ## Points to a file where all sync logs should be saved to.
 audit-log-path: "path/to/file"

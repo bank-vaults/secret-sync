@@ -1,3 +1,17 @@
+// Copyright © 2023 Cisco
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package v1alpha1
 
 import (
@@ -10,19 +24,10 @@ import (
 var (
 	DefaultSyncJobSchedule     = "@hourly"
 	DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
-	DefaultSyncJobHistoryLimit = 32
 )
 
 // SyncJobSpec defines a source-to-dest sync request CR.
 type SyncJobSpec struct {
-	// Used to configure the source for sync request.
-	// Required
-	SourceRef SecretStoreRef `json:"source"`
-
-	// Used to configure the destination for sync request.
-	// Required
-	DestRef SecretStoreRef `json:"dest"`
-
 	// Used to configure schedule for synchronization.
 	// The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
 	// Defaults to @hourly
@@ -37,11 +42,6 @@ type SyncJobSpec struct {
 	// Used to specify sync plan.
 	// Required
 	Plan []SecretKeyFromRef `json:"plan,omitempty"`
-
-	// The number of sync results to retain.
-	// Defaults to 32.
-	// Optional
-	HistoryLimit *int32 `json:"history-limit,omitempty"`
 
 	// Points to a file where all sync logs should be saved to.
 	// Defaults to DefaultSyncJobAuditLogPath
@@ -69,11 +69,4 @@ func (spec *SyncJobSpec) GetAuditLogPath() string {
 		return DefaultSyncJobAuditLogPath
 	}
 	return spec.AuditLogPath
-}
-
-func (spec *SyncJobSpec) GetHistoryLimit() int32 {
-	if spec.HistoryLimit == nil || *spec.HistoryLimit <= 0 {
-		return int32(DefaultSyncJobHistoryLimit)
-	}
-	return *spec.HistoryLimit
 }

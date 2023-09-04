@@ -1,3 +1,17 @@
+// Copyright © 2023 Cisco
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storesync
 
 import (
@@ -14,8 +28,8 @@ import (
 // syncRequest defines data required to perform a key sync.
 // This is the minimal unit of work for full v1alpha1.SecretKey sync.
 type syncRequest struct {
-	SecretKey v1alpha1.SecretKey
-	Rewrite   []v1alpha1.SecretKeyRewrite
+	SecretKey    v1alpha1.SecretKey
+	KeyTransform []v1alpha1.SecretKeyTransform
 }
 
 // Status defines response data returned by Sync.
@@ -61,8 +75,8 @@ func Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreW
 				// Submit keys for sync
 				for i := range secretKeys {
 					syncQueue <- syncRequest{
-						SecretKey: secretKeys[i], // use fetched key
-						Rewrite:   ref.Rewrite,   // use same rewrite
+						SecretKey:    secretKeys[i],    // use fetched key
+						KeyTransform: ref.KeyTransform, // use same transform
 					}
 				}
 			}(refs[i])
@@ -162,8 +176,8 @@ func doRequest(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.S
 	// TODO: Consider adding a check to see if the secret needs to be updated.
 	// TODO: This adds additional option to Sync CRD => skip API set if get didn't change since last time
 
-	// Rewrite before writing to dest
-	updatedKey, err := applyRewrites(key, req.Rewrite)
+	// Transform before writing to dest
+	updatedKey, err := applyTransform(key, req.KeyTransform)
 	if err != nil {
 		return key, err
 	}
@@ -177,11 +191,11 @@ func doRequest(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.S
 	return updatedKey, nil
 }
 
-// applyRewrites applies rewrites to v1alpha1.SecretKey and returns updated key or error.
-func applyRewrites(secretKey v1alpha1.SecretKey, rewrites []v1alpha1.SecretKeyRewrite) (v1alpha1.SecretKey, error) {
-	for _, rewrite := range rewrites {
+// applyTransform applies transform to v1alpha1.SecretKey and returns updated key or error.
+func applyTransform(secretKey v1alpha1.SecretKey, transforms []v1alpha1.SecretKeyTransform) (v1alpha1.SecretKey, error) {
+	for _, transform := range transforms {
 		// Update Regexp field
-		keyRegex := rewrite.Regexp
+		keyRegex := transform.Regexp
 		if keyRegex == nil {
 			continue
 		}
