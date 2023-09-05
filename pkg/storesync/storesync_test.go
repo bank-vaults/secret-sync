@@ -46,12 +46,12 @@ func TestSync(t *testing.T) {
 	testCtx := context.Background()
 
 	// Define sync data
-	//source := createFileStore(t, "from-dir")
-	//dest := createFileStore(t, "to-dir")
+	source := createFileStore(t, "from-dir")
+	dest := createFileStore(t, "to-dir")
 	//source := createVaultStore(t, "http://0.0.0.0:8200", "root")
 	//dest := createVaultStore(t, "http://0.0.0.0:8201", "root")
-	source := createKubernetesStore(t, "from")
-	dest := createKubernetesStore(t, "to")
+	//source := createKubernetesStore(t, "from")
+	//dest := createKubernetesStore(t, "to")
 
 	expected := fromKeys("a", "b/b", "c/c/c", "d/d/d/0", "d/d/d/1", "d/d/d/2", "d/d/d/d")
 	requests := append(

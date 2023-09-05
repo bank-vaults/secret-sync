@@ -20,6 +20,7 @@ import (
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 	"github.com/bank-vaults/vault-sdk/vault"
 	"github.com/spf13/cast"
+	"regexp"
 	"strings"
 )
 
@@ -29,6 +30,10 @@ type client struct {
 }
 
 func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, error) {
+	if err := validate(key); err != nil {
+		return nil, err
+	}
+
 	// Get secret from API
 	keyPath := pathForKey(key)
 	response, err := c.apiClient.RawClient().Logical().Read(fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath))
@@ -50,20 +55,19 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, e
 		return nil, fmt.Errorf("api get request findind data: %w", err)
 	}
 
-	// Get property
-	property := key.GetKey()
-	propertyData, ok := data[property]
+	// Get key data
+	keyData, ok := data[key.GetKey()]
 	if !ok {
-		return nil, fmt.Errorf("could not find property %s for in get response", property)
+		return nil, fmt.Errorf("could not find %s for in get response", key.GetKey())
 	}
-	return []byte(propertyData.(string)), nil
+	return []byte(keyData.(string)), nil
 }
 
 func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery) ([]v1alpha1.SecretKey, error) {
 	// Get relative path to dir
 	queryPath := ""
 	if query.Path != nil {
-		queryPath = *query.Path
+		queryPath = *query.Path + "/"
 	}
 
 	// List API request
@@ -90,11 +94,13 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 	// A key in a KV store can be either a secret or a dir (marked by a suffix '/').
 	var result []v1alpha1.SecretKey
 	for _, listKey := range listSlice {
-		keyPath := fmt.Sprintf("%s%v", queryPath, listKey)
-		if !strings.HasSuffix(keyPath, "/") { // key
-			result = append(result, v1alpha1.SecretKey{
-				Key: keyPath,
-			})
+		key := listKey.(string)
+		if !strings.HasSuffix(key, "/") { // key
+			if ok, _ := regexp.MatchString(query.Key.Regexp, key); ok {
+				result = append(result, v1alpha1.SecretKey{
+					Key: fmt.Sprintf("%s%v", queryPath, listKey),
+				})
+			}
 		}
 	}
 
@@ -102,13 +108,17 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 }
 
 func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []byte) error {
+	if err := validate(key); err != nil {
+		return err
+	}
+
 	// Write secret to API
 	keyPath := pathForKey(key)
 	_, err := c.apiClient.RawClient().Logical().Write(
 		fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath),
 		map[string]interface{}{
 			"data": map[string]interface{}{
-				key.GetKey(): value,
+				key.GetKey(): string(value),
 			},
 		},
 	)
@@ -167,6 +177,16 @@ func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.Sec
 	}
 
 	return result, nil
+}
+
+func validate(key v1alpha1.SecretKey) error {
+	if key.GetKey() == "" {
+		return fmt.Errorf("vault store requires key data")
+	}
+	if key.GetProperty() != "" {
+		return fmt.Errorf("vault store does not accept property data")
+	}
+	return nil
 }
 
 func pathForKey(key v1alpha1.SecretKey) string {

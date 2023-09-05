@@ -15,25 +15,17 @@
 package v1alpha1
 
 import (
-	"fmt"
 	"strings"
 )
-
-var ErrKeyPathUnsupported = fmt.Errorf("provider does not support secret keys with path")
 
 // SecretKey defines Provider key params.
 // TODO: Add support for different encodings (to decode when fetching).
 type SecretKey struct {
 	// Key points to a specific key in store.
-	// Accepted formats: "key", "path/to/key".
-	// Some Provider do not support "path/to/key" and will throw ErrKeyPathUnsupported.
+	// Accepted formats: "key", "key.property", "path/to/key", "path/to/key.property".
+	// Not all Provider accept these formats.
 	// Required
 	Key string `json:"key"`
-
-	// Property selects a specific map property of the Provider value.
-	// TODO: Add support on providers
-	// Optional
-	Property string `json:"property,omitempty"`
 
 	// Version points to specific key version.
 	// TODO: Add support on providers
@@ -44,7 +36,7 @@ type SecretKey struct {
 // GetPath returns path pointed by Key, e.g. GetPath("path/to/key") returns ["path", "to"]
 func (key *SecretKey) GetPath() []string {
 	parts := strings.Split(key.Key, "/")
-	if len(parts) == 0 {
+	if len(parts) <= 1 {
 		return nil
 	}
 	return parts[:len(parts)-1]
@@ -54,9 +46,18 @@ func (key *SecretKey) GetPath() []string {
 func (key *SecretKey) GetKey() string {
 	parts := strings.Split(key.Key, "/")
 	if len(parts) == 0 {
-		return key.Key
+		return strings.SplitN(key.Key, ".", 2)[0]
 	}
-	return parts[len(parts)-1]
+	return strings.SplitN(parts[len(parts)-1], ".", 2)[0]
+}
+
+// GetProperty returns property pointed by Key, e.g. GetProperty("path/to/key.property") returns "property"
+func (key *SecretKey) GetProperty() string {
+	parts := strings.SplitN(key.Key, ".", 2)
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
 }
 
 // SecretKeyFromRef defines SecretKey data to fetch and transform from referenced store.

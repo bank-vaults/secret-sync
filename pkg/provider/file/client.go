@@ -20,6 +20,7 @@ import (
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -50,9 +51,11 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 		// Only add files
 		if entry != nil && entry.Type().IsRegular() {
 			relativePath := strings.ReplaceAll(path, c.dir+string(os.PathSeparator), "")
-			result = append(result, v1alpha1.SecretKey{
-				Key: strings.ReplaceAll(relativePath, string(os.PathSeparator), "/"),
-			})
+			if ok, _ := regexp.MatchString(query.Key.Regexp, filepath.Base(relativePath)); ok {
+				result = append(result, v1alpha1.SecretKey{
+					Key: strings.ReplaceAll(relativePath, string(os.PathSeparator), "/"),
+				})
+			}
 		}
 		return nil
 	})
