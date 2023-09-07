@@ -17,10 +17,11 @@ package file
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
 type client struct {

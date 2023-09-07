@@ -17,12 +17,14 @@ package storesync
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
-	"github.com/sirupsen/logrus"
 	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
 // syncRequest defines data required to perform a key sync.

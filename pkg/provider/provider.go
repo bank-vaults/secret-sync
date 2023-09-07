@@ -17,8 +17,8 @@ package provider
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 	// Register providers
 	_ "github.com/bank-vaults/secret-sync/pkg/provider/file"
 	_ "github.com/bank-vaults/secret-sync/pkg/provider/vault"

@@ -15,8 +15,9 @@
 package main
 
 import (
-	"github.com/bank-vaults/secret-sync/cmd"
 	"github.com/sirupsen/logrus"
+
+	"github.com/bank-vaults/secret-sync/cmd"
 )
 
 func main() {

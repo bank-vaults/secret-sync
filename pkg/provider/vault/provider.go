@@ -17,8 +17,10 @@ package vault
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
+
 	"github.com/bank-vaults/vault-sdk/vault"
+
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
 type Provider struct{}

@@ -18,15 +18,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
-	"github.com/bank-vaults/secret-sync/pkg/provider"
-	"github.com/bank-vaults/secret-sync/pkg/storesync"
+	"os"
+	"os/signal"
+
 	"github.com/ghodss/yaml"
 	"github.com/krayzpipes/cronticker/cronticker"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"os/signal"
+
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
+	"github.com/bank-vaults/secret-sync/pkg/provider"
+	"github.com/bank-vaults/secret-sync/pkg/storesync"
 )
 
 func NewSyncCmd() *cobra.Command {
