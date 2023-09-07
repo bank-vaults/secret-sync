@@ -1,2 +1,6 @@
-bin/
-build/
+/.devenv/
+/.direnv/
+/.pre-commit-config.yaml
+/bin/
+/build/
+/tmp/
