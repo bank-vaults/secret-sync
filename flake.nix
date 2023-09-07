@@ -38,6 +38,7 @@
               gnumake
 
               # golangci-lint
+              goreleaser
 
               yamllint
               # hadolint
