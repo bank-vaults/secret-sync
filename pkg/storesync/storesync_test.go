@@ -16,14 +16,16 @@ package storesync_test
 
 import (
 	"context"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
-	"github.com/bank-vaults/secret-sync/pkg/provider"
-	"github.com/bank-vaults/secret-sync/pkg/storesync"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
+	"github.com/bank-vaults/secret-sync/pkg/provider"
+	"github.com/bank-vaults/secret-sync/pkg/storesync"
 )
 
 func BenchmarkSync(b *testing.B) {
@@ -141,7 +143,7 @@ func createVaultStore(t *testing.T, addr, token string) v1alpha1.StoreClient {
 
 type fakeClient struct{}
 
-func (c *fakeClient) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, error) {
+func (c *fakeClient) GetSecret(_ context.Context, _ v1alpha1.SecretKey) ([]byte, error) {
 	return []byte(""), nil
 }
 
@@ -149,6 +151,6 @@ func (c *fakeClient) ListSecretKeys(_ context.Context, _ v1alpha1.SecretKeyQuery
 	return []v1alpha1.SecretKey{{}, {}}, nil
 }
 
-func (c *fakeClient) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []byte) error {
+func (c *fakeClient) SetSecret(_ context.Context, _ v1alpha1.SecretKey, _ []byte) error {
 	return nil
 }

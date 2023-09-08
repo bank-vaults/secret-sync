@@ -17,10 +17,12 @@ package vault
 import (
 	"context"
 	"fmt"
-	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
+	"strings"
+
 	"github.com/bank-vaults/vault-sdk/vault"
 	"github.com/spf13/cast"
-	"strings"
+
+	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
 type client struct {
@@ -123,6 +125,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []by
 // Not used since it has high memory footprint and does not handle search.
 // It could (potentially) be useful.
 // DEPRECATED
+//nolint
 func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretKey, error) {
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))

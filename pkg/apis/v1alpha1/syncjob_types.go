@@ -15,10 +15,11 @@
 package v1alpha1
 
 import (
-	"github.com/robfig/cron"
-	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+
+	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
 )
 
 var (
