@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
@@ -28,7 +29,7 @@ type client struct {
 	dir string
 }
 
-func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, error) {
+func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, error) {
 	// Read file
 	fpath := filepath.Join(c.dir, pathForKey(key))
 	data, err := os.ReadFile(fpath)
@@ -38,7 +39,7 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, e
 	return data, nil
 }
 
-func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery) ([]v1alpha1.SecretKey, error) {
+func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretRefQuery) ([]v1alpha1.SecretRef, error) {
 	// Get query dir (if empty, use root)
 	queryDir := c.dir
 	if query.Path != nil {
@@ -46,14 +47,20 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 	}
 
 	// Add all files that match filter from queried dir
-	var result []v1alpha1.SecretKey
+	var result []v1alpha1.SecretRef
 	err := filepath.WalkDir(queryDir, func(path string, entry os.DirEntry, err error) error {
 		// Only add files
 		if entry != nil && entry.Type().IsRegular() {
+			// Extract secret key from the relative OS system path
 			relativePath := strings.ReplaceAll(path, c.dir+string(os.PathSeparator), "")
-			result = append(result, v1alpha1.SecretKey{
-				Key: strings.ReplaceAll(relativePath, string(os.PathSeparator), "/"),
-			})
+			key := strings.ReplaceAll(relativePath, string(os.PathSeparator), "/")
+
+			// Add key if it matches regexp query
+			if matches, _ := regexp.MatchString(query.Regexp.Key, key); matches {
+				result = append(result, v1alpha1.SecretRef{
+					Key: key,
+				})
+			}
 		}
 		return nil
 	})
@@ -63,7 +70,7 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 	return result, nil
 }
 
-func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []byte) error {
+func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []byte) error {
 	// Create parent dir for file
 	fpath := filepath.Join(c.dir, pathForKey(key))
 	parentDir := filepath.Dir(fpath)
@@ -79,6 +86,6 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []by
 	return nil
 }
 
-func pathForKey(key v1alpha1.SecretKey) string {
+func pathForKey(key v1alpha1.SecretRef) string {
 	return filepath.Join(append(key.GetPath(), key.GetProperty())...)
 }

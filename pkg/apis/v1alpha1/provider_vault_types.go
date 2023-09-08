@@ -14,7 +14,12 @@
 
 package v1alpha1
 
-// SecretStoreProviderFile defines provider for a file.
-type SecretStoreProviderFile struct {
-	DirPath string `json:"dir-path"`
+// VaultProvider uses Hashicorp Vault as a backend.
+type VaultProvider struct {
+	Address        string `json:"address"`
+	UnsealKeysPath string `json:"unsealKeysPath"`
+	Role           string `json:"role"`
+	AuthPath       string `json:"authPath"`
+	TokenPath      string `json:"tokenPath"`
+	Token          string `json:"token"`
 }

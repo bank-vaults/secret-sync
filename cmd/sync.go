@@ -68,7 +68,7 @@ type syncCmd struct {
 
 	source v1alpha1.StoreReader
 	dest   v1alpha1.StoreWriter
-	sync   *v1alpha1.SyncJobSpec
+	sync   *v1alpha1.SyncJob
 }
 
 func (cmd *syncCmd) init() error {
@@ -115,7 +115,7 @@ func (cmd *syncCmd) init() error {
 	return nil
 }
 
-func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJobSpec) error {
+func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	// Run once
 	if syncReq.RunOnce {
 		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Plan)
@@ -150,8 +150,8 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJobSpec) error {
 	}
 }
 
-// loadRequest loads apis.SyncJobSpec data from a YAML file.
-func loadRequest(path string) (*v1alpha1.SyncJobSpec, error) {
+// loadRequest loads apis.SyncJob data from a YAML file.
+func loadRequest(path string) (*v1alpha1.SyncJob, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -159,7 +159,7 @@ func loadRequest(path string) (*v1alpha1.SyncJobSpec, error) {
 	}
 
 	// Unmarshal (convert YAML to JSON)
-	var ruleCfg v1alpha1.SyncJobSpec
+	var ruleCfg v1alpha1.SyncJob
 	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 	if err != nil {
 		return nil, err

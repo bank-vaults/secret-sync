@@ -25,3 +25,57 @@ plan:
 
 ## Points to a file where all sync logs should be saved to.
 audit-log-path: "path/to/file"
+
+dataFrom:
+  ## Reference key
+  - name: username
+    secretRef:
+      key: /credentials/username
+
+  ## Reference key
+  - name: password
+    secretRef:
+      key: /credentials/password
+
+  ## Reference key map field
+  - name: mapField
+    secretRef:
+      key: /credentials/map
+      property: field
+
+  ## Reference query, can return 0, 1, or multiple values
+  - name: dynamic-query
+    secretQuery:
+      path: /credentials
+      regexp:
+        key: .*
+        # property: field
+        # version: 1
+
+dataTo:
+  ## Key-value, no templating, static values
+  - key: /credentials/default-value
+    value: new-username
+
+  ## Key-map, no templating, static values (either value or valueMap can be set, not both)
+  - key: /credentials/default-data
+    valueMap:
+      username: new-username
+      password: new-password
+
+  ## Key-value, templated, dynamic values
+  - key: {{ pathTo .username }}
+    value: {{ .username }}/{{ .password }}
+
+  ## Key-map, templated, dynamic values
+  - key: {{ pathTo .username }}
+    valueMap:
+      username: {{ .username }}
+      password: {{ .password }}
+
+  ## Key-map from query, templated, dynamic values
+  ## If the references are not found from the dynamic query, this will be skipped
+  - key: {{ pathTo .dynamic-query.username }}
+    valueMap:
+      username: {{ .dynamic-query.username }}
+      password: {{ .dynamic-query.password }}

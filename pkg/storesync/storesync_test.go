@@ -75,27 +75,27 @@ func TestSync(t *testing.T) {
 	}
 }
 
-func initStore(t *testing.T, store v1alpha1.StoreClient, keys []v1alpha1.SecretKey) {
+func initStore(t *testing.T, store v1alpha1.StoreClient, keys []v1alpha1.SecretRef) {
 	for _, key := range keys {
 		assert.Nil(t, store.SetSecret(context.Background(), key, []byte(key.Key)))
 	}
 }
 
-func fromKeys(keys ...string) []v1alpha1.SecretKey {
-	result := make([]v1alpha1.SecretKey, 0)
+func fromKeys(keys ...string) []v1alpha1.SecretRef {
+	result := make([]v1alpha1.SecretRef, 0)
 	for _, key := range keys {
-		result = append(result, v1alpha1.SecretKey{
+		result = append(result, v1alpha1.SecretRef{
 			Key: key,
 		})
 	}
 	return result
 }
 
-func refKeys(keys ...string) []v1alpha1.SecretKeyFromRef {
-	result := make([]v1alpha1.SecretKeyFromRef, 0)
+func refKeys(keys ...string) []v1alpha1.SecretRemoteRef {
+	result := make([]v1alpha1.SecretRemoteRef, 0)
 	for _, key := range keys {
-		result = append(result, v1alpha1.SecretKeyFromRef{
-			SecretKey: &v1alpha1.SecretKey{
+		result = append(result, v1alpha1.SecretRemoteRef{
+			Secret: &v1alpha1.SecretRef{
 				Key: key,
 			},
 		})
@@ -103,8 +103,8 @@ func refKeys(keys ...string) []v1alpha1.SecretKeyFromRef {
 	return result
 }
 
-func refFilter(path string, filter string) v1alpha1.SecretKeyFromRef {
-	return v1alpha1.SecretKeyFromRef{
+func refFilter(path string, filter string) v1alpha1.SecretRemoteRef {
+	return v1alpha1.SecretRemoteRef{
 		Query: &v1alpha1.SecretKeyQuery{
 			Path: &path,
 			Key: &v1alpha1.RegexpQuery{
@@ -119,8 +119,8 @@ func createFileStore(t *testing.T, name string) v1alpha1.StoreClient {
 	assert.Nil(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(path) })
 
-	client, err := provider.NewClient(context.Background(), &v1alpha1.SecretStoreProvider{
-		File: &v1alpha1.SecretStoreProviderFile{
+	client, err := provider.NewClient(context.Background(), &v1alpha1.ProviderBackend{
+		File: &v1alpha1.FileProvider{
 			DirPath: path,
 		},
 	})
@@ -129,8 +129,8 @@ func createFileStore(t *testing.T, name string) v1alpha1.StoreClient {
 }
 
 func createVaultStore(t *testing.T, addr, token string) v1alpha1.StoreClient {
-	client, err := provider.NewClient(context.Background(), &v1alpha1.SecretStoreProvider{
-		Vault: &v1alpha1.SecretStoreProviderVault{
+	client, err := provider.NewClient(context.Background(), &v1alpha1.ProviderBackend{
+		Vault: &v1alpha1.VaultProvider{
 			Address:        addr,
 			UnsealKeysPath: "secret",
 			AuthPath:       "userpass",
@@ -147,8 +147,8 @@ func (c *fakeClient) GetSecret(_ context.Context, _ v1alpha1.SecretKey) ([]byte,
 	return []byte(""), nil
 }
 
-func (c *fakeClient) ListSecretKeys(_ context.Context, _ v1alpha1.SecretKeyQuery) ([]v1alpha1.SecretKey, error) {
-	return []v1alpha1.SecretKey{{}, {}}, nil
+func (c *fakeClient) ListSecretKeys(_ context.Context, _ v1alpha1.SecretKeyQuery) ([]v1alpha1.SecretRef, error) {
+	return []v1alpha1.SecretRef{{}, {}}, nil
 }
 
 func (c *fakeClient) SetSecret(_ context.Context, _ v1alpha1.SecretKey, _ []byte) error {

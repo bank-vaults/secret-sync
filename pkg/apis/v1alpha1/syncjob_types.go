@@ -27,8 +27,14 @@ var (
 	DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
 )
 
-// SyncJobSpec defines a source-to-dest sync request CR.
-type SyncJobSpec struct {
+// SyncJob defines a source-to-dest sync request.
+// TODO: Add support for auditing.
+type SyncJob struct {
+	// Points to a file where all sync logs should be saved to.
+	// Defaults to DefaultSyncJobAuditLogPath
+	// Optional
+	AuditLogPath string `json:"auditLogPath,omitempty"`
+
 	// Used to configure schedule for synchronization.
 	// The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
 	// Defaults to @hourly
@@ -38,22 +44,18 @@ type SyncJobSpec struct {
 	// Used to only perform sync once.
 	// If specified, Schedule will be ignored.
 	// Optional
-	RunOnce bool `json:"run-once,omitempty"`
+	RunOnce bool `json:"runOnce,omitempty"`
 
-	// Used to specify sync plan.
+	// Used to specify the source strategy for data fetch.
 	// Required
-	Plan []SecretKeyFromRef `json:"plan,omitempty"`
+	DataFrom []StrategyDataFrom `json:"dataFrom,omitempty"`
 
-	// Points to a file where all sync logs should be saved to.
-	// Defaults to DefaultSyncJobAuditLogPath
-	// Optional
-	// TODO: Implement support for audit log file.
-	//  Only write successful key syncs to this file.
-	//  Consider exposing String() to get basic API details on v1alpha1.StoreClient.
-	AuditLogPath string `json:"audit-log-path,omitempty"`
+	// Used to specify the target strategy for data sync.
+	// Required
+	DataTo []StrategyDataTo `json:"dataTo,omitempty"`
 }
 
-func (spec *SyncJobSpec) GetSchedule() string {
+func (spec *SyncJob) GetSchedule() string {
 	if spec.Schedule == "" {
 		return DefaultSyncJobSchedule
 	}
@@ -65,9 +67,40 @@ func (spec *SyncJobSpec) GetSchedule() string {
 	return spec.Schedule
 }
 
-func (spec *SyncJobSpec) GetAuditLogPath() string {
+func (spec *SyncJob) GetAuditLogPath() string {
 	if spec.AuditLogPath == "" {
 		return DefaultSyncJobAuditLogPath
 	}
 	return spec.AuditLogPath
+}
+
+// StrategyDataFrom defines how to fetch SecretRef from source store.
+// TODO: Add support for specifying different source.
+type StrategyDataFrom struct {
+	// Used to define unique name for templating.
+	// Required
+	Name string `json:"name"`
+
+	// Used to find secret key based on reference.
+	// Optional, but SecretQuery must be provided
+	SecretRef *SecretRef `json:"secretRef,omitempty"`
+
+	// Used to find secret key based on query.
+	// Optional, but SecretRef must be provided
+	SecretQuery *SecretRefQuery `json:"secretQuery,omitempty"`
+}
+
+// StrategyDataTo defines how to sync fetched SecretRef to target store.
+type StrategyDataTo struct {
+	// Used to define target key. Supports templating.
+	// Required
+	Key string `json:"key"`
+
+	// Used to define the resulting value. Supports templating.
+	// Optional, but ValueMap must be provided
+	Value *string `json:"value,omitempty"`
+
+	// Used to define the resulting value map. Supports templating.
+	// Optional, but Value must be provided
+	ValueMap map[string]string `json:"valueMap,omitempty"`
 }

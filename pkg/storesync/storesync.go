@@ -28,9 +28,9 @@ import (
 )
 
 // syncRequest defines data required to perform a key sync.
-// This is the minimal unit of work for full v1alpha1.SecretKey sync.
+// This is the minimal unit of work for full v1alpha1.SecretRef sync.
 type syncRequest struct {
-	SecretKey    v1alpha1.SecretKey
+	SecretKey    v1alpha1.SecretRef
 	KeyTransform []v1alpha1.SecretKeyTransform
 }
 
@@ -44,7 +44,7 @@ type Status struct {
 }
 
 // Sync will synchronize keys from source to dest based on provided specs.
-func Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, refs []v1alpha1.SecretKeyFromRef) (*Status, error) {
+func Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, refs []v1alpha1.SecretRemoteRef) (*Status, error) {
 	// Validate
 	if source == nil {
 		return nil, fmt.Errorf("source is nil")
@@ -65,7 +65,7 @@ func Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreW
 		extractWg := sync.WaitGroup{}
 		for i := range refs {
 			extractWg.Add(1)
-			go func(ref v1alpha1.SecretKeyFromRef) {
+			go func(ref v1alpha1.SecretRemoteRef) {
 				defer extractWg.Done()
 
 				// Fetch keys
@@ -140,19 +140,19 @@ func Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreW
 	}, nil
 }
 
-// getKeys fetches (one or multiple) v1alpha1.SecretKey for a single v1alpha1.SecretKeyFromRef.
-// Performs an API list request on source if ref Query is specified to get multiple v1alpha1.SecretKey.
-func getKeys(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.SecretKeyFromRef) ([]v1alpha1.SecretKey, error) {
+// getKeys fetches (one or multiple) v1alpha1.SecretRef for a single v1alpha1.SecretRemoteRef.
+// Performs an API list request on source if ref Query is specified to get multiple v1alpha1.SecretRef.
+func getKeys(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.SecretRemoteRef) ([]v1alpha1.SecretRef, error) {
 	// Validate
-	if ref.SecretKey == nil && ref.Query == nil {
-		return nil, fmt.Errorf("both SecretKey and Query are empty, at least one required")
+	if ref.Secret == nil && ref.Query == nil {
+		return nil, fmt.Errorf("both SecretRef and Query are empty, at least one required")
 	}
 
 	// Get keys
-	var keys []v1alpha1.SecretKey
-	if ref.SecretKey != nil {
+	var keys []v1alpha1.SecretRef
+	if ref.Secret != nil {
 		// Add static key
-		keys = append(keys, *ref.SecretKey)
+		keys = append(keys, *ref.Secret)
 	}
 	if ref.Query != nil {
 		// Get keys from API
@@ -167,7 +167,7 @@ func getKeys(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.Secr
 }
 
 // doRequest will sync a given syncRequest from source to dest. Returns key that was synced to dest or error.
-func doRequest(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, req syncRequest) (v1alpha1.SecretKey, error) {
+func doRequest(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, req syncRequest) (v1alpha1.SecretRef, error) {
 	// Get from source
 	key := req.SecretKey
 	value, err := source.GetSecret(ctx, key)
@@ -193,8 +193,8 @@ func doRequest(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.S
 	return updatedKey, nil
 }
 
-// applyTransform applies transform to v1alpha1.SecretKey and returns updated key or error.
-func applyTransform(secretKey v1alpha1.SecretKey, transforms []v1alpha1.SecretKeyTransform) (v1alpha1.SecretKey, error) {
+// applyTransform applies transform to v1alpha1.SecretRef and returns updated key or error.
+func applyTransform(secretKey v1alpha1.SecretRef, transforms []v1alpha1.SecretKeyTransform) (v1alpha1.SecretRef, error) {
 	for _, transform := range transforms {
 		// Update Regexp field
 		keyRegex := transform.Regexp
