@@ -17,14 +17,13 @@ package vault
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/bank-vaults/vault-sdk/vault"
 	"github.com/spf13/cast"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
-	"regexp"
-	"strings"
 )
 
 type client struct {
@@ -135,7 +134,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []by
 // It could (potentially) be useful.
 // DEPRECATED
 //nolint
-func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretKey, error) {
+func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) {
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))
 	if err != nil {

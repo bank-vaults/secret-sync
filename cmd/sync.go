@@ -17,7 +17,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -36,7 +35,7 @@ func NewSyncCmd() *cobra.Command {
 	cmd := &syncCmd{}
 	cobraCmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Synchronizes a key-value destination store from source store",
+		Short: "Synchronizes secrets from a source to a target store based on sync strategy.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := cmd.init(); err != nil {
 				return err
@@ -46,15 +45,20 @@ func NewSyncCmd() *cobra.Command {
 	}
 
 	// Register cmd flags
-	cobraCmd.Flags().StringVar(&cmd.flgSrcFile, "source", "", "Source store config file")
+	cobraCmd.Flags().StringVar(&cmd.flgSrcFile, "source", "", "Source store config file. "+
+		"This is the store where the data will be fetched from.")
 	_ = cobraCmd.MarkFlagRequired("source")
-	cobraCmd.Flags().StringVar(&cmd.flagDstFile, "dest", "", "Destination store config file")
-	_ = cobraCmd.MarkFlagRequired("dest")
-	cobraCmd.Flags().StringVar(&cmd.flagSyncFile, "sync", "", "Sync job config file")
-	_ = cobraCmd.MarkFlagRequired("sync")
+	cobraCmd.Flags().StringVar(&cmd.flagDstFile, "target", "", "Target store config file. "+
+		"This is the store where the data will be synced to.")
+	_ = cobraCmd.MarkFlagRequired("target")
+	cobraCmd.Flags().StringVar(&cmd.flagPlanFile, "plan", "", "Sync job config file. "+
+		"This is the strategy sync template.")
+	_ = cobraCmd.MarkFlagRequired("plan")
 
-	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", v1alpha1.DefaultSyncJobSchedule, "Synchronization CRON schedule. Overrides --sync params")
-	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false, "Synchronize once and exit. Overrides --sync params")
+	cobraCmd.Flags().StringVar(&cmd.flagSync, "sync", v1alpha1.DefaultSyncJobSchedule,
+		"Synchronization CRON schedule. Either --sync or --once should be specified.")
+	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false,
+		"Synchronize once and exit. Either --sync or --once should be specified.")
 
 	return cobraCmd
 }
@@ -62,8 +66,8 @@ func NewSyncCmd() *cobra.Command {
 type syncCmd struct {
 	flgSrcFile   string
 	flagDstFile  string
-	flagSyncFile string
-	flagSchedule string
+	flagPlanFile string
+	flagSync     string
 	flagOnce     bool
 
 	source v1alpha1.StoreReader
@@ -79,10 +83,7 @@ func (cmd *syncCmd) init() error {
 	if err != nil {
 		return err
 	}
-	if !srcStore.GetPermissions().CanPerform(v1alpha1.SecretStorePermissionsRead) {
-		return fmt.Errorf("source does not have Read permissions")
-	}
-	cmd.source, err = provider.NewClient(context.Background(), &srcStore.Provider)
+	cmd.source, err = provider.NewClient(context.Background(), srcStore)
 	if err != nil {
 		return err
 	}
@@ -92,24 +93,21 @@ func (cmd *syncCmd) init() error {
 	if err != nil {
 		return err
 	}
-	if !destStore.GetPermissions().CanPerform(v1alpha1.SecretStorePermissionsWrite) {
-		return fmt.Errorf("dest does not have Write permissions")
-	}
-	cmd.dest, err = provider.NewClient(context.Background(), &destStore.Provider)
+	cmd.dest, err = provider.NewClient(context.Background(), destStore)
 	if err != nil {
 		return err
 	}
 
 	// Init sync request by loading from file and overriding from cli
-	cmd.sync, err = loadRequest(cmd.flagSyncFile)
+	cmd.sync, err = loadStrategy(cmd.flagPlanFile)
 	if err != nil {
 		return err
 	}
 	if cmd.flagOnce {
 		cmd.sync.RunOnce = cmd.flagOnce
 	}
-	if cmd.flagSchedule != "" {
-		cmd.sync.Schedule = cmd.flagSchedule
+	if cmd.flagSync != "" {
+		cmd.sync.Schedule = cmd.flagSync
 	}
 
 	return nil
@@ -118,7 +116,7 @@ func (cmd *syncCmd) init() error {
 func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	// Run once
 	if syncReq.RunOnce {
-		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Plan)
+		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.DataFrom, syncReq.DataTo)
 		if err != nil {
 			return err
 		}
@@ -138,7 +136,7 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 		select {
 		case <-cronTicker.C:
 			logrus.Info("Handling a new sync request...")
-			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Plan)
+			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.DataFrom, syncReq.DataTo)
 			if err != nil {
 				return err
 			}
@@ -150,8 +148,7 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	}
 }
 
-// loadRequest loads apis.SyncJob data from a YAML file.
-func loadRequest(path string) (*v1alpha1.SyncJob, error) {
+func loadStrategy(path string) (*v1alpha1.SyncJob, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -170,8 +167,7 @@ func loadRequest(path string) (*v1alpha1.SyncJob, error) {
 	return &ruleCfg, nil
 }
 
-// loadStore loads apis.SecretStoreSpec from a YAML file.
-func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
+func loadStore(path string) (*v1alpha1.ProviderBackend, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -179,7 +175,7 @@ func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
 	}
 
 	// Unmarshal (convert YAML to JSON)
-	var spec v1alpha1.SecretStoreSpec
+	var spec v1alpha1.ProviderBackend
 	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 	if err != nil {
 		return nil, err

@@ -27,8 +27,8 @@ func TestSync(t *testing.T) {
 	syncCmd := NewSyncCmd()
 	syncCmd.SetArgs([]string{
 		"--source", storeFile(t, "testdata/source"),
-		"--dest", storeFile(t, filepath.Join(os.TempDir(), "dest")),
-		"--sync", "testdata/syncjob.yaml",
+		"--target", storeFile(t, filepath.Join(os.TempDir(), "dest")),
+		"--plan", "testdata/syncjob.yaml",
 		"--once",
 	})
 	err := syncCmd.Execute()
@@ -49,10 +49,8 @@ func storeFile(t *testing.T, dirPath string) string {
 
 	// Write
 	_, err = tmpFile.Write([]byte(fmt.Sprintf(`
-permissions: ReadWrite
-provider:
-  file:
-    dir-path: %q
+file:
+  dirPath: %q
 `, path)))
 	assert.Nil(t, err)
 

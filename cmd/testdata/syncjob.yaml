@@ -4,78 +4,81 @@ schedule: "@daily"
 
 ## Used to only perform sync once.
 ## If specified, Schedule will be ignored.
-run-once: false
-
-## Used to specify overall sync plan between source and dest
-plan:
-  - secret:
-      key: a
-  - secret:
-      key: b/b
-  - secret:
-      key: c/c/c
-  - query:
-      path: "d/d/d"
-      key:
-        regexp: .*
-    key-transform:
-      - regexp:
-          source: "d/d/d/(.*)"
-          target: "d/d/d/$1-final"
+runOnce: false
 
 ## Points to a file where all sync logs should be saved to.
-audit-log-path: "path/to/file"
+auditLogPath: "path/to/file"
 
-dataFrom:
-  ## Reference key
+## Defines global secret mappings.
+mappings:
+  ## Username mapping
   - name: username
     secretRef:
       key: /credentials/username
 
-  ## Reference key
+  ## Password mapping
   - name: password
     secretRef:
       key: /credentials/password
 
-  ## Reference key map field
-  - name: mapField
-    secretRef:
-      key: /credentials/map
-      property: field
-
-  ## Reference query, can return 0, 1, or multiple values
+  ## Query mapping, returned keys will be available as "dynamic-query.<key>"
   - name: dynamic-query
     secretQuery:
       path: /credentials
       regexp:
         key: .*
-        # property: field
-        # version: 1
 
-dataTo:
-  ## Key-value, no templating, static values
-  - key: /credentials/default-value
-    value: new-username
+## Defines how the secrets will be synced.
+strategy:
+  ## 1. Usage: Sync key from source to target
+  - secretRef:
+      key: /credentials/source/username
+    # If not specified, will be synced under the same key
+    destKey: /credentials/target/username
 
-  ## Key-map, no templating, static values (either value or valueMap can be set, not both)
-  - key: /credentials/default-data
-    valueMap:
-      username: new-username
-      password: new-password
+  ## 2. Usage: Sync queryable keys from source to target
+  - secretQuery:
+      path: /credentials/source
+      regexp:
+        key: .*
+    # If not specified, will be synced under the same path
+    destPath: /credentials/target
 
-  ## Key-value, templated, dynamic values
-  - key: {{ pathTo .username }}
-    value: {{ .username }}/{{ .password }}
+  ## 3. Usage: Sync key(s) from source to target via custom boilerplate
+  - secretRef:
+      key: /credentials/source/username
+    # Boilerplate defines how the secret key data will be synced to dest source.
+    # It is possible to specify multiple boilerplate items.
+    boilerplate:
+      - key: '/credentials/target/username'
+        # Reserved word "self" defines a mapping of the fetched secretRef.
+        # You can also use global mappings here, e.g. {{ valueOf "username" }}.
+        value: 'prefix-{{ valueOf "self" }}'
 
-  ## Key-map, templated, dynamic values
-  - key: {{ pathTo .username }}
-    valueMap:
-      username: {{ .username }}
-      password: {{ .password }}
+  ## 4. Usage: Sync key(s) from global mappings to target via custom boilerplate
+  - boilerplate:
+    - key: '/credentials/target/{{ keyOf "username"" }}'
+      value: '{{ valueOf "username" }}'
 
-  ## Key-map from query, templated, dynamic values
-  ## If the references are not found from the dynamic query, this will be skipped
-  - key: {{ pathTo .dynamic-query.username }}
-    valueMap:
-      username: {{ .dynamic-query.username }}
-      password: {{ .dynamic-query.password }}
+    - key: '/credentials/target/auth'
+      valueMap:
+        username: '{{ valueOf "username" }}'
+        password: '{{ valueOf "password" }}'
+
+    - key: '/credentials/target/dynamic-query'
+      valueMap:
+        username: '{{ valueOf "dynamic-query.username" }}'
+        password: '{{ valueOf "dynamic-query.password" }}'
+
+  ## 5. Usage: Sync queryable keys from source to dest via custom boilerplate
+  - secretQuery:
+      path: /credentials/source
+      regexp:
+        key: .*
+    boilerplate:
+      # All results returned by the query will be executed against the templates.
+      # If the template matches "if", it will be synced based on the template config.
+      # Reserved word "queryItem" defines a mapping of the current loop query item.
+      - if: '{{ (keyOf "queryItem") eq "data" }}' # optional, true if not set
+        key: '/credentials/target/{{ keyOf "queryItem"" }}'
+        value: 'admin/{{ valueOf "queryItem" }}/{{ valueOf "username" }}'
