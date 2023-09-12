@@ -9,76 +9,83 @@ runOnce: false
 ## Points to a file where all sync logs should be saved to.
 auditLogPath: "path/to/file"
 
-## Defines global secret mappings.
-mappings:
-  ## Username mapping
-  - name: username
-    secretRef:
-      key: /credentials/username
-
-  ## Password mapping
-  - name: password
-    secretRef:
-      key: /credentials/password
-
-  ## Query mapping, returned keys will be available as "dynamic-query.<key>"
-  - name: dynamic-query
-    secretQuery:
-      path: /credentials
-      regexp:
-        key: .*
-
-## Defines how the secrets will be synced.
+## Defines how the secrets will be synced
 strategy:
-  ## 1. Usage: Sync key from source to target
-  - secretRef:
-      key: /credentials/source/username
-    # If not specified, will be synced under the same key
-    destKey: /credentials/target/username
+  ## 1. Usage: Sync key from ref
+  - fromRef:
+      key: /credentials/source/example
+    target: # If not specified, will be synced under the same key
+      key: /credentials/target/example     # synced under /credentials/target/example
+      # key: example                       # synced under /credentials/source/example
 
-  ## 2. Usage: Sync queryable keys from source to target
-  - secretQuery:
+  ## 2. Usage: Sync all keys from query
+  - fromQuery:
       path: /credentials/source
-      regexp:
-        key: .*
-    # If not specified, will be synced under the same path
-    destPath: /credentials/target
+      key:
+        regexp: .*
+    target: # If not specified, all keys will be synced under the same path
+      keyPrefix: /credentials/target    # synced under /credentials/target/<KEY>
+      # keyPrefix: target-              # synced under /credentials/source/target-<KEY>
 
-  ## 3. Usage: Sync key(s) from source to target via custom boilerplate
-  - secretRef:
-      key: /credentials/source/username
-    # Boilerplate defines how the secret key data will be synced to dest source.
-    # It is possible to specify multiple boilerplate items.
-    boilerplate:
-      - key: '/credentials/target/username'
-        # Reserved word "self" defines a mapping of the fetched secretRef.
-        # You can also use global mappings here, e.g. {{ valueOf "username" }}.
-        value: 'prefix-{{ valueOf "self" }}'
+  ## 3. Usage: Sync key from ref with templating
+  - fromRef:
+      key: /credentials/source
+    target:
+      key: /credentials/target
 
-  ## 4. Usage: Sync key(s) from global mappings to target via custom boilerplate
-  - boilerplate:
-    - key: '/credentials/target/{{ keyOf "username"" }}'
-      value: '{{ valueOf "username" }}'
+    # Template defines how the secret will be synced to dest store.
+    # Either "rawData" or "data" should be specified, not both.
+    template:
+      rawData: {{ .Data }}  # Save as raw (accepts multiline string)
+      data:                 # Save as map (accepts nested values)
+        example: {{ .Data }}
 
-    - key: '/credentials/target/auth'
-      valueMap:
-        username: '{{ valueOf "username" }}'
-        password: '{{ valueOf "password" }}'
-
-    - key: '/credentials/target/dynamic-query'
-      valueMap:
-        username: '{{ valueOf "dynamic-query.username" }}'
-        password: '{{ valueOf "dynamic-query.password" }}'
-
-  ## 5. Usage: Sync queryable keys from source to dest via custom boilerplate
-  - secretQuery:
+  ## 4. Usage: Sync all keys from query with templating
+  - fromQuery:
       path: /credentials/source
-      regexp:
-        key: .*
-    boilerplate:
-      # All results returned by the query will be executed against the templates.
-      # If the template matches "if", it will be synced based on the template config.
-      # Reserved word "queryItem" defines a mapping of the current loop query item.
-      - if: '{{ (keyOf "queryItem") eq "data" }}' # optional, true if not set
-        key: '/credentials/target/{{ keyOf "queryItem"" }}'
-        value: 'admin/{{ valueOf "queryItem" }}/{{ valueOf "username" }}'
+      key:
+        regexp: .*
+    target:
+      keyPrefix: /credentials/target
+    template:
+      rawData: SECRET-PREFIX-{{ .Data }}
+
+  ## 5. Usage: Sync single key from query with templating
+  - fromQuery:
+      path: /credentials/source
+      key:
+        regexp: (username|password)
+
+    flatten: true # "target.key" must be specified when using "flatten"
+    target:
+      key: /credentials/target/example
+
+    template:
+      data:
+        user: {{ .Data.username }}
+        pass: {{ .Data.password }}
+
+  ## 6. Usage: Sync single key from multiple sources with templating
+  - sources:
+      - name: username # Username mapping, available as ".Data.username"
+        fromRef:
+          key: /credentials/source/username
+
+      - name: password # Password mapping, available as ".Data.password"
+        fromRef:
+          key: /credentials/source/password
+
+      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
+        fromQuery:
+          path: /credentials/source
+          key:
+            regexp: .*
+
+    target:
+      key: /credentials/target/example
+
+    template:
+      data:
+        username: {{ .Data.username }}
+        password: {{ .Data.password }}
+        userpass: {{ .Data.dynamic_query.username }}/{{ .Data.dynamic_query.password }}

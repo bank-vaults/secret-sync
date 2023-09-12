@@ -41,8 +41,7 @@ type Status struct {
 func Sync(ctx context.Context,
 	source v1alpha1.StoreReader,
 	dest v1alpha1.StoreWriter,
-	dataFrom []v1alpha1.StrategyDataFrom,
-	dataTo []v1alpha1.StrategyDataTo,
+	items []v1alpha1.SyncItem,
 ) (*Status, error) {
 	// Validate
 	if source == nil {
@@ -51,31 +50,28 @@ func Sync(ctx context.Context,
 	if dest == nil {
 		return nil, fmt.Errorf("dest is nil")
 	}
-	if len(dataFrom) == 0 {
-		return nil, fmt.Errorf("empty dataFrom")
-	}
-	if len(dataTo) == 0 {
-		return nil, fmt.Errorf("empty dataTo")
+	if len(items) == 0 {
+		return nil, fmt.Errorf("nothing to sync")
 	}
 
-	// Define intermediate
-	kvStore := newKvStore()
+	// Define intermediate store
+	store := newKvStore()
 
-	// Fetch keys based on ref params and add them to sync queue.
+	// Fetch keys from source and add them to internal store.
 	// Do each fetch in a separate goroutine (there could be API requests).
 	{
 		extractWg := sync.WaitGroup{}
-		for i := range dataFrom {
+		for i := range items {
 			extractWg.Add(1)
-			go func(ref v1alpha1.StrategyDataFrom) {
+			go func(item v1alpha1.SyncItem) {
 				defer extractWg.Done()
 
-				// Fetch keys
-				err := kvStore.Fetch(ctx, source, ref)
+				// Fetch keys to store
+				err := store.Add(ctx, source, item)
 				if err != nil {
-					logrus.WithField("ref-fetch", ref).Warnf("Failed to fetch, reason: %v", err)
+					logrus.WithField("from", item).Warnf("Failed to fetch, reason: %v", err)
 				}
-			}(dataFrom[i])
+			}(items[i])
 		}
 		extractWg.Wait()
 	}

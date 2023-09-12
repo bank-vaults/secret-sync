@@ -49,22 +49,22 @@ func (key *SecretRef) GetProperty() string {
 	return parts[len(parts)-1]
 }
 
-// SecretRefQuery defines how to query Provider to obtain SecretRef.
-type SecretRefQuery struct {
+// SecretQuery defines how to query Provider to obtain SecretRef(s).
+// TODO: Add support for version
+// TODO: Add support for map field selector
+// TODO: Add support for encoding
+type SecretQuery struct {
 	// A root path to start the query operations.
 	// Optional
 	Path *string `json:"path,omitempty"`
 
-	// Finds SecretRef based on the regexp params.
+	// Finds SecretRef based on key query.
 	// Required
-	Regexp QueryRegexp `json:"regexp"`
+	Key Query `json:"key"`
 }
 
-// QueryRegexp defines how to search for a SecretRef using regexp query.
-// TODO: Add support for version
-// TODO: Add support for map field selector
-type QueryRegexp struct {
-	// Searches SecretRef based on key query
-	// Required
-	Key string `json:"key"`
+// Query defines how to match string-value data.
+type Query struct {
+	// Uses regexp matching
+	Regexp string `json:"regexp"`
 }

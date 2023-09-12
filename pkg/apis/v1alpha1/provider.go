@@ -36,7 +36,7 @@ type StoreReader interface {
 	GetSecret(ctx context.Context, key SecretRef) ([]byte, error)
 
 	// ListSecretKeys lists all keys matching the query from secret store.
-	ListSecretKeys(ctx context.Context, query SecretRefQuery) ([]SecretRef, error)
+	ListSecretKeys(ctx context.Context, query SecretQuery) ([]SecretRef, error)
 }
 
 // StoreWriter implements write ops for a secret backend. Must support concurrent calls.

@@ -5,190 +5,228 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"sync"
 	"text/template"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
-type kvData struct {
-	key   v1alpha1.SecretRef
+type keyData struct {
 	value []byte
 }
 
 type kvStore struct {
 	mu   sync.RWMutex
-	data map[string]kvData
+	data map[v1alpha1.SecretRef]keyData
 }
 
 func newKvStore() *kvStore {
 	return &kvStore{
 		mu:   sync.RWMutex{},
-		data: map[string]kvData{},
+		data: map[v1alpha1.SecretRef]keyData{},
 	}
 }
 
-// Fetch fetches v1alpha1.SecretRef data for a v1alpha1.StrategyDataFrom.
-func (s *kvStore) Fetch(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.StrategyDataFrom) error {
-	// Validate
-	if ref.Name == "" {
-		return fmt.Errorf("cannot use empty Name")
-	}
-	if ref.SecretRef == nil && ref.SecretQuery == nil {
-		return fmt.Errorf("both SecretRef and SecretQuery are empty, at least one required")
-	}
-	if ref.SecretRef != nil && ref.SecretQuery != nil {
-		return fmt.Errorf("both SecretRef and SecretQuery are provided, only one required")
+// FetchFromRef fetches v1alpha1.SecretRef data from reference or internal store.
+func (s *kvStore) FetchFromRef(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.SecretRef) (map[v1alpha1.SecretRef]keyData, error) {
+	// Check if exists
+	if data, exists := s.GetKey(ref); exists {
+		return map[v1alpha1.SecretRef]keyData{ref: data}, nil
 	}
 
-	// Handle ref key
-	if ref.SecretRef != nil {
-		value, err := source.GetSecret(ctx, *ref.SecretRef)
-		if err != nil {
-			return err
-		}
-		s.setKeyValue(ref.Name, *ref.SecretRef, value, false)
-		return nil
-	}
-
-	// Handle ref query
-	listKeys, err := source.ListSecretKeys(ctx, *ref.SecretQuery)
+	// Get secret
+	value, err := source.GetSecret(ctx, ref)
 	if err != nil {
-		return fmt.Errorf("failed while doing query %v: %w", *ref.SecretQuery, err)
+		return nil, err
 	}
 
-	// Fetch key values from source parallelly
+	// Update internal store
+	s.SetKey(ref, value)
+	data, _ := s.GetKey(ref)
+	return map[v1alpha1.SecretRef]keyData{ref: data}, nil
+}
+
+// FetchFromQuery fetches v1alpha1.SecretRef data from query or internal store.
+func (s *kvStore) FetchFromQuery(ctx context.Context, source v1alpha1.StoreReader, query v1alpha1.SecretQuery) (map[v1alpha1.SecretRef]keyData, error) {
+	// List secrets
+	listKeys, err := source.ListSecretKeys(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed while doing query %v: %w", query, err)
+	}
+
+	// Fetch key values from source in parallel
+	data := make(map[v1alpha1.SecretRef]keyData)
+	dataMu := sync.RWMutex{}
 	procGroup, procCtx := errgroup.WithContext(ctx)
 	for _, key := range listKeys {
 		func(key v1alpha1.SecretRef) {
 			procGroup.Go(func() error {
-				value, err := source.GetSecret(procCtx, key)
+				// Fetch
+				result, err := s.FetchFromRef(procCtx, source, key)
 				if err != nil {
 					return err
 				}
-				s.setKeyValue(ref.Name, key, value, true)
+
+				// Update
+				dataMu.Lock()
+				for key, value := range result {
+					data[key] = value
+				}
+				dataMu.Unlock()
 				return nil
 			})
 		}(key)
 	}
 
-	// Wait for error
-	return procGroup.Wait()
-}
-
-// Sync syncs v1alpha1.SecretRef data for a v1alpha1.StrategyDataTo.
-func (s *kvStore) Sync(ctx context.Context, dest v1alpha1.StoreWriter, ref v1alpha1.StrategyDataTo) (*v1alpha1.SecretRef, error) {
-	// Validate
-	if ref.Key == "" {
-		return nil, fmt.Errorf("cannot use empty Key")
-	}
-	if ref.Value == nil && ref.ValueMap == nil {
-		return nil, fmt.Errorf("both Value and ValueMap are empty, at least one required")
-	}
-	if ref.Value != nil && ref.ValueMap != nil {
-		return nil, fmt.Errorf("both Value and ValueMap are provided, only one required")
-	}
-
-	// Get key
-	keyName, err := s.getTemplatedKey(ref.Key)
-	if err != nil {
+	// Return
+	if err = procGroup.Wait(); err != nil {
 		return nil, err
 	}
-	keyToSync := &v1alpha1.SecretRef{
-		Key: keyName,
-	}
-
-	// Handle ref value
-	if ref.Value != nil {
-		value, err := s.getTemplatedValue(*ref.Value)
-		if err != nil {
-			return nil, err
-		}
-		return keyToSync, dest.SetSecret(ctx, *keyToSync, value)
-	}
-
-	// Handle ref value map
-	valueMap := make(map[string][]byte)
-	for key, value := range ref.ValueMap {
-		templatedValue, err := s.getTemplatedValue(value)
-		if err != nil {
-			return nil, err
-		}
-		valueMap[key] = templatedValue
-	}
-
-	rawValueMap, err := json.Marshal(valueMap)
-	if err != nil {
-		return nil, err
-	}
-	return keyToSync, dest.SetSecret(ctx, *keyToSync, rawValueMap)
+	return data, nil
 }
 
-func (s *kvStore) getKeyValue(name string) (kvData, bool) {
+// FetchFromSelectors fetches v1alpha1.SecretRef data from selectors or internal store.
+func (s *kvStore) FetchFromSelectors(ctx context.Context, source v1alpha1.StoreReader, selectors []v1alpha1.SecretsSelector) (map[v1alpha1.SecretRef]keyData, error) {
+	// Fetch key values from source in parallel
+	data := make(map[v1alpha1.SecretRef]keyData)
+	dataMu := sync.RWMutex{}
+	procGroup, procCtx := errgroup.WithContext(ctx)
+	for _, selector := range selectors {
+		func(selector v1alpha1.SecretsSelector) {
+			procGroup.Go(func() error {
+				// Fetch
+				var err error
+				var result map[v1alpha1.SecretRef]keyData
+				if selector.FromRef != nil {
+					result, err = s.FetchFromRef(procCtx, source, *selector.FromRef)
+				} else if selector.FromQuery != nil {
+					result, err = s.FetchFromQuery(procCtx, source, *selector.FromQuery)
+				} else {
+					return fmt.Errorf("both ref and query are empty")
+				}
+
+				// Check error
+				if err != nil {
+					return err
+				}
+
+				// Update
+				dataMu.Lock()
+				for key, value := range result {
+					data[key] = value
+				}
+				dataMu.Unlock()
+				return nil
+			})
+		}(selector)
+	}
+
+	// Return
+	if err := procGroup.Wait(); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// Fetch fetches data from API or local store.
+func (s *kvStore) Fetch(ctx context.Context, source v1alpha1.StoreReader, item v1alpha1.SyncItem) (map[v1alpha1.SecretRef]keyData, error) {
+	if item.FromRef != nil {
+		return s.FetchFromRef(ctx, source, *item.FromRef)
+	} else if item.FromQuery != nil {
+		return s.FetchFromQuery(ctx, source, *item.FromQuery)
+	} else if len(item.FromSources) > 0 {
+		return s.FetchFromSelectors(ctx, source, item.FromSources)
+	}
+	return nil, fmt.Errorf("no sources specified")
+}
+
+func (s *kvStore) GetKey(key v1alpha1.SecretRef) (keyData, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	if res, ok := s.data[name]; ok {
+	if res, ok := s.data[key]; ok {
 		return res, true
 	}
-	return kvData{}, false
+	return keyData{}, false
 }
 
-func (s *kvStore) setKeyValue(name string, key v1alpha1.SecretRef, value []byte, isQuery bool) {
+func (s *kvStore) SetKey(key v1alpha1.SecretRef, value []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	strKey := name
-	if isQuery {
-		strKey = name + "." + key.GetProperty()
-	}
-
-	s.data[strKey] = kvData{
-		key:   key,
+	s.data[key] = keyData{
 		value: value,
 	}
 }
 
-func (s *kvStore) getTemplatedKey(key string) (string, error) {
-	tmpl, err := template.New("key").Funcs(template.FuncMap{
-		"pathTo": func(obj any) (string, error) {
-			key, _ := obj.(string)
-			value, ok := s.getKeyValue(key)
-			if !ok {
-				return "", fmt.Errorf("key %v not found", obj)
-			}
-			return value.key.Key, nil
-		},
-	}).Parse(key)
+func (s *kvStore) Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, item v1alpha1.SyncItem) error {
+	// Fetch data
+	data, err := s.Fetch(ctx, source, item)
 	if err != nil {
-		return "", err
+		return err
 	}
-	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, nil)
-	if err != nil {
-		return "", err
+
+	// Get template
+	var syncValue []byte
+	if item.Template != nil {
+
 	}
-	return buf.String(), nil
+
+	// Sync to a single key
+    keysToSync := make(map[v1alpha1.SecretRef][]byte)
+	if item.Target.Key != nil {
+		data, err :=
+	} else if item.Target.KeyPrefix != nil {
+
+	}
+
+	return nil
 }
 
-func (s *kvStore) getTemplatedValue(key string) ([]byte, error) {
-	tmpl, err := template.New("key").Funcs(template.FuncMap{
-		"valueOf": func(obj any) ([]byte, error) {
-			key, _ := obj.(string)
-			value, ok := s.getKeyValue(key)
-			if !ok {
-				return nil, fmt.Errorf("key %v not found", obj)
+func dataToTemplateData(data map[v1alpha1.SecretRef]keyData) struct{ Data interface{} } {
+	extracted := make(map[string][]byte)
+	var lastValue []byte
+	for key, value := range data {
+		lastValue = value.value
+		extracted[key.GetProperty()] = value.value
+	}
+	if len(data) == 1 {
+		return struct{ Data interface{} }{Data: lastValue}
+	}
+	return struct{ Data interface{} }{Data: extracted}
+}
+
+func getTemplatedValue(item v1alpha1.SyncItem, data interface{}) ([]byte, error) {
+	if item.Template == nil {
+		return nil, nil
+	}
+
+	if item.Template.RawData != nil {
+		return applyTemplate(*item.Template.RawData, data)
+	}
+
+	if len(item.Template.Data) > 0 {
+		var templateMap map[string][]byte
+		for key, valueTemplate := range item.Template.Data {
+			result, err := applyTemplate(valueTemplate, data)
+			if err != nil {
+				return nil, err
 			}
-			return value.value, nil
-		},
-	}).Parse(key)
+			templateMap[key] = result
+		}
+		return json.Marshal(templateMap)
+	}
+
+	return nil, fmt.Errorf("empty template")
+}
+
+func applyTemplate(tpl string, data interface{}) ([]byte, error) {
+	// Apply templates
+	tmpl, err := template.New("template").Parse(tpl)
 	if err != nil {
 		return nil, err
 	}
 	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, nil)
+	err = tmpl.Execute(buf, data)
 	if err != nil {
 		return nil, err
 	}

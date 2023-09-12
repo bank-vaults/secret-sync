@@ -39,7 +39,7 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, e
 	return data, nil
 }
 
-func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretRefQuery) ([]v1alpha1.SecretRef, error) {
+func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) ([]v1alpha1.SecretRef, error) {
 	// Get query dir (if empty, use root)
 	queryDir := c.dir
 	if query.Path != nil {
