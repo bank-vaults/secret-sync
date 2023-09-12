@@ -10,82 +10,85 @@ runOnce: false
 auditLogPath: "path/to/file"
 
 ## Defines how the secrets will be synced
-strategy:
+sync:
   ## 1. Usage: Sync key from ref
   - fromRef:
-      key: /credentials/source/example
+      key: source/credentials/example
+
+  - fromRef:
+      key: source/credentials/example
     target: # If not specified, will be synced under the same key
-      key: /credentials/target/example     # synced under /credentials/target/example
-      # key: example                       # synced under /credentials/source/example
+      key: credentials/target/example     # synced under /credentials/target/example
+      # key: example                       # synced under /source/credentials/example
 
   ## 2. Usage: Sync all keys from query
   - fromQuery:
-      path: /credentials/source
+      path: source/credentials
       key:
         regexp: .*
     target: # If not specified, all keys will be synced under the same path
-      keyPrefix: /credentials/target    # synced under /credentials/target/<KEY>
-      # keyPrefix: target-              # synced under /credentials/source/target-<KEY>
+      keyPrefix: credentials/target    # synced under /credentials/target/<KEY>
+      # keyPrefix: target-              # synced under /source/credentials/target-<KEY>
 
-  ## 3. Usage: Sync key from ref with templating
-  - fromRef:
-      key: /credentials/source
-    target:
-      key: /credentials/target
-
-    # Template defines how the secret will be synced to dest store.
-    # Either "rawData" or "data" should be specified, not both.
-    template:
-      rawData: {{ .Data }}  # Save as raw (accepts multiline string)
-      data:                 # Save as map (accepts nested values)
-        example: {{ .Data }}
-
-  ## 4. Usage: Sync all keys from query with templating
-  - fromQuery:
-      path: /credentials/source
-      key:
-        regexp: .*
-    target:
-      keyPrefix: /credentials/target
-    template:
-      rawData: SECRET-PREFIX-{{ .Data }}
-
-  ## 5. Usage: Sync single key from query with templating
-  - fromQuery:
-      path: /credentials/source
-      key:
-        regexp: (username|password)
-
-    flatten: true # "target.key" must be specified when using "flatten"
-    target:
-      key: /credentials/target/example
-
-    template:
-      data:
-        user: {{ .Data.username }}
-        pass: {{ .Data.password }}
-
-  ## 6. Usage: Sync single key from multiple sources with templating
-  - sources:
-      - name: username # Username mapping, available as ".Data.username"
-        fromRef:
-          key: /credentials/source/username
-
-      - name: password # Password mapping, available as ".Data.password"
-        fromRef:
-          key: /credentials/source/password
-
-      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
-        fromQuery:
-          path: /credentials/source
-          key:
-            regexp: .*
-
-    target:
-      key: /credentials/target/example
-
-    template:
-      data:
-        username: {{ .Data.username }}
-        password: {{ .Data.password }}
-        userpass: {{ .Data.dynamic_query.username }}/{{ .Data.dynamic_query.password }}
+#  ## 3. Usage: Sync key from ref with templating
+#  - fromRef:
+#      key: /source/credentials
+#    target:
+#      key: /credentials/target
+#
+#    # Template defines how the secret will be synced to dest store.
+#    # Either "rawData" or "data" should be specified, not both.
+#    template:
+#      rawData: {{ .Data }}  # Save as raw (accepts multiline string)
+#      data:                 # Save as map (accepts nested values)
+#        example: {{ .Data }}
+#
+#  ## 4. Usage: Sync all keys from query with templating
+#  - fromQuery:
+#      path: /source/credentials
+#      key:
+#        regexp: .*
+#    target:
+#      keyPrefix: /credentials/target
+#    template:
+#      rawData: SECRET-PREFIX-{{ .Data }}
+#
+#  ## 5. Usage: Sync single key from query with templating
+#  - fromQuery:
+#      path: /source/credentials
+#      key:
+#        regexp: (username|password)
+#
+#    flatten: true # "target.key" must be specified when using "flatten"
+#    target:
+#      key: /credentials/target/example
+#
+#    template:
+#      data:
+#        user: {{ .Data.username }}
+#        pass: {{ .Data.password }}
+#
+#  ## 6. Usage: Sync single key from multiple sources with templating
+#  - sources:
+#      - name: username # Username mapping, available as ".Data.username"
+#        fromRef:
+#          key: /source/credentials/username
+#
+#      - name: password # Password mapping, available as ".Data.password"
+#        fromRef:
+#          key: /source/credentials/password
+#
+#      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
+#        fromQuery:
+#          path: /source/credentials
+#          key:
+#            regexp: .*
+#
+#    target:
+#      key: /credentials/target/example
+#
+#    template:
+#      data:
+#        username: {{ .Data.username }}
+#        password: {{ .Data.password }}
+#        userpass: {{ .Data.dynamic_query.username }}/{{ .Data.dynamic_query.password }}

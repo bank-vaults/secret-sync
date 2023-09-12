@@ -116,7 +116,7 @@ func (cmd *syncCmd) init() error {
 func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	// Run once
 	if syncReq.RunOnce {
-		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.DataFrom, syncReq.DataTo)
+		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Sync)
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 		select {
 		case <-cronTicker.C:
 			logrus.Info("Handling a new sync request...")
-			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.DataFrom, syncReq.DataTo)
+			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Sync)
 			if err != nil {
 				return err
 			}

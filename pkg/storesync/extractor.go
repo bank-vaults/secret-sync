@@ -3,7 +3,6 @@ package storesync
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"golang.org/x/sync/errgroup"
 	"sync"
@@ -12,27 +11,27 @@ import (
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
 
-type keyData struct {
+type kvData struct {
 	value []byte
 }
 
 type kvStore struct {
 	mu   sync.RWMutex
-	data map[v1alpha1.SecretRef]keyData
+	data map[v1alpha1.SecretRef]kvData
 }
 
 func newKvStore() *kvStore {
 	return &kvStore{
 		mu:   sync.RWMutex{},
-		data: map[v1alpha1.SecretRef]keyData{},
+		data: map[v1alpha1.SecretRef]kvData{},
 	}
 }
 
 // FetchFromRef fetches v1alpha1.SecretRef data from reference or internal store.
-func (s *kvStore) FetchFromRef(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.SecretRef) (map[v1alpha1.SecretRef]keyData, error) {
+func (s *kvStore) FetchFromRef(ctx context.Context, source v1alpha1.StoreReader, ref v1alpha1.SecretRef) (map[v1alpha1.SecretRef]kvData, error) {
 	// Check if exists
 	if data, exists := s.GetKey(ref); exists {
-		return map[v1alpha1.SecretRef]keyData{ref: data}, nil
+		return map[v1alpha1.SecretRef]kvData{ref: data}, nil
 	}
 
 	// Get secret
@@ -44,11 +43,13 @@ func (s *kvStore) FetchFromRef(ctx context.Context, source v1alpha1.StoreReader,
 	// Update internal store
 	s.SetKey(ref, value)
 	data, _ := s.GetKey(ref)
-	return map[v1alpha1.SecretRef]keyData{ref: data}, nil
+	return map[v1alpha1.SecretRef]kvData{
+		ref: data,
+	}, nil
 }
 
 // FetchFromQuery fetches v1alpha1.SecretRef data from query or internal store.
-func (s *kvStore) FetchFromQuery(ctx context.Context, source v1alpha1.StoreReader, query v1alpha1.SecretQuery) (map[v1alpha1.SecretRef]keyData, error) {
+func (s *kvStore) FetchFromQuery(ctx context.Context, source v1alpha1.StoreReader, query v1alpha1.SecretQuery) (map[v1alpha1.SecretRef]kvData, error) {
 	// List secrets
 	listKeys, err := source.ListSecretKeys(ctx, query)
 	if err != nil {
@@ -56,7 +57,7 @@ func (s *kvStore) FetchFromQuery(ctx context.Context, source v1alpha1.StoreReade
 	}
 
 	// Fetch key values from source in parallel
-	data := make(map[v1alpha1.SecretRef]keyData)
+	data := make(map[v1alpha1.SecretRef]kvData)
 	dataMu := sync.RWMutex{}
 	procGroup, procCtx := errgroup.WithContext(ctx)
 	for _, key := range listKeys {
@@ -87,9 +88,9 @@ func (s *kvStore) FetchFromQuery(ctx context.Context, source v1alpha1.StoreReade
 }
 
 // FetchFromSelectors fetches v1alpha1.SecretRef data from selectors or internal store.
-func (s *kvStore) FetchFromSelectors(ctx context.Context, source v1alpha1.StoreReader, selectors []v1alpha1.SecretsSelector) (map[v1alpha1.SecretRef]keyData, error) {
+func (s *kvStore) FetchFromSelectors(ctx context.Context, source v1alpha1.StoreReader, selectors []v1alpha1.SecretsSelector) (map[v1alpha1.SecretRef]kvData, error) {
 	// Fetch key values from source in parallel
-	data := make(map[v1alpha1.SecretRef]keyData)
+	data := make(map[v1alpha1.SecretRef]kvData)
 	dataMu := sync.RWMutex{}
 	procGroup, procCtx := errgroup.WithContext(ctx)
 	for _, selector := range selectors {
@@ -97,7 +98,7 @@ func (s *kvStore) FetchFromSelectors(ctx context.Context, source v1alpha1.StoreR
 			procGroup.Go(func() error {
 				// Fetch
 				var err error
-				var result map[v1alpha1.SecretRef]keyData
+				var result map[v1alpha1.SecretRef]kvData
 				if selector.FromRef != nil {
 					result, err = s.FetchFromRef(procCtx, source, *selector.FromRef)
 				} else if selector.FromQuery != nil {
@@ -130,7 +131,7 @@ func (s *kvStore) FetchFromSelectors(ctx context.Context, source v1alpha1.StoreR
 }
 
 // Fetch fetches data from API or local store.
-func (s *kvStore) Fetch(ctx context.Context, source v1alpha1.StoreReader, item v1alpha1.SyncItem) (map[v1alpha1.SecretRef]keyData, error) {
+func (s *kvStore) Fetch(ctx context.Context, source v1alpha1.StoreReader, item v1alpha1.SyncItem) (map[v1alpha1.SecretRef]kvData, error) {
 	if item.FromRef != nil {
 		return s.FetchFromRef(ctx, source, *item.FromRef)
 	} else if item.FromQuery != nil {
@@ -141,82 +142,84 @@ func (s *kvStore) Fetch(ctx context.Context, source v1alpha1.StoreReader, item v
 	return nil, fmt.Errorf("no sources specified")
 }
 
-func (s *kvStore) GetKey(key v1alpha1.SecretRef) (keyData, bool) {
+func (s *kvStore) GetKey(key v1alpha1.SecretRef) (kvData, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if res, ok := s.data[key]; ok {
 		return res, true
 	}
-	return keyData{}, false
+	return kvData{}, false
 }
 
 func (s *kvStore) SetKey(key v1alpha1.SecretRef, value []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.data[key] = keyData{
+	s.data[key] = kvData{
 		value: value,
 	}
 }
 
-func (s *kvStore) Sync(ctx context.Context, source v1alpha1.StoreReader, dest v1alpha1.StoreWriter, item v1alpha1.SyncItem) error {
-	// Fetch data
-	data, err := s.Fetch(ctx, source, item)
+func (s *kvStore) GetSyncData(ctx context.Context, source v1alpha1.StoreReader, item v1alpha1.SyncItem) (map[v1alpha1.SecretRef]kvData, error) {
+	// Fetch store data
+	sourceData, err := s.Fetch(ctx, source, item)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Get template
-	var syncValue []byte
-	if item.Template != nil {
-
-	}
-
-	// Sync to a single key
-    keysToSync := make(map[v1alpha1.SecretRef][]byte)
-	if item.Target.Key != nil {
-		data, err :=
-	} else if item.Target.KeyPrefix != nil {
-
-	}
-
-	return nil
-}
-
-func dataToTemplateData(data map[v1alpha1.SecretRef]keyData) struct{ Data interface{} } {
-	extracted := make(map[string][]byte)
-	var lastValue []byte
-	for key, value := range data {
-		lastValue = value.value
-		extracted[key.GetProperty()] = value.value
-	}
-	if len(data) == 1 {
-		return struct{ Data interface{} }{Data: lastValue}
-	}
-	return struct{ Data interface{} }{Data: extracted}
-}
-
-func getTemplatedValue(item v1alpha1.SyncItem, data interface{}) ([]byte, error) {
-	if item.Template == nil {
-		return nil, nil
-	}
-
-	if item.Template.RawData != nil {
-		return applyTemplate(*item.Template.RawData, data)
-	}
-
-	if len(item.Template.Data) > 0 {
-		var templateMap map[string][]byte
-		for key, valueTemplate := range item.Template.Data {
-			result, err := applyTemplate(valueTemplate, data)
-			if err != nil {
-				return nil, err
-			}
-			templateMap[key] = result
+	// Process keys
+	keysToSync := map[v1alpha1.SecretRef]kvData{}
+	switch target := item.Target; {
+	// Handle KeyPrefix which indicates that multiple keys need to be synced
+	case target.KeyPrefix != nil:
+		// Supports FromQuery
+		if item.FromQuery == nil {
+			return nil, fmt.Errorf("requires 'fromQuery' for 'target.keyPrefix'")
 		}
-		return json.Marshal(templateMap)
+		for key, keyData := range sourceData {
+			keysToSync[prefixedKey(key, *target.KeyPrefix)] = keyData
+		}
+		return keysToSync, nil
+
+	// Handle Key which indicates that only one key needs to be synced
+	case target.Key != nil:
+		// Supports FromRef
+		if item.FromRef != nil {
+			for key, keyData := range sourceData {
+				keysToSync[newKey(*target.Key, key.Version)] = keyData
+			}
+			return keysToSync, nil
+		}
+
+		// Supports FromQuery
+		if item.FromQuery != nil {
+			if item.Template != nil {
+				return nil, fmt.Errorf("requires 'template' for 'fromQuery' and 'target.key'")
+			}
+			return keysToSync, nil
+		}
+
+		// Supports FromSources
+		if len(item.FromSources) > 0 {
+			if item.Template != nil {
+				return nil, fmt.Errorf("requires 'template' for 'fromSources' and 'target.key'")
+			}
+			return keysToSync, nil
+		}
+
+	// Handle empty
+	default:
+		// Supports FromRef
+		if item.FromRef == nil {
+			return nil, fmt.Errorf("requires at least 'fromRef' for empty 'target'")
+		}
+		for _, keyData := range sourceData {
+			keysToSync[*item.FromRef] = keyData
+		}
+		return keysToSync, nil
 	}
 
-	return nil, fmt.Errorf("empty template")
+	// Synchronize
+	return nil, fmt.Errorf("invalid request")
 }
 
 func applyTemplate(tpl string, data interface{}) ([]byte, error) {
@@ -231,4 +234,18 @@ func applyTemplate(tpl string, data interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func prefixedKey(key v1alpha1.SecretRef, prefix string) v1alpha1.SecretRef {
+	return v1alpha1.SecretRef{
+		Key:     prefix + key.GetProperty(),
+		Version: key.Version,
+	}
+}
+
+func newKey(key string, version *string) v1alpha1.SecretRef {
+	return v1alpha1.SecretRef{
+		Key:     key,
+		Version: version,
+	}
 }

@@ -56,7 +56,7 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 			key := strings.ReplaceAll(relativePath, string(os.PathSeparator), "/")
 
 			// Add key if it matches regexp query
-			if matches, _ := regexp.MatchString(query.Regexp.Key, key); matches {
+			if matches, _ := regexp.MatchString(query.Key.Regexp, key); matches {
 				result = append(result, v1alpha1.SecretRef{
 					Key: key,
 				})

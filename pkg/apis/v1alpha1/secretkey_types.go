@@ -24,7 +24,7 @@ type SecretRef struct {
 	// Key points to a specific key in store.
 	// Format "path/to/key"
 	// Required
-	Key string `json:"key"`
+	Key string `json:"key,omitempty"`
 
 	// Version points to specific key version.
 	// Optional
@@ -33,7 +33,7 @@ type SecretRef struct {
 
 // GetPath returns path pointed by Key, e.g. GetPath("/path/to/key") returns ["path", "to"]
 func (key *SecretRef) GetPath() []string {
-	parts := strings.Split(key.Key, "/")
+	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
 	if len(parts) == 0 {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (key *SecretRef) GetPath() []string {
 
 // GetProperty returns property (domain) pointed by Key, e.g. GetProperty("/path/to/key") returns "key"
 func (key *SecretRef) GetProperty() string {
-	parts := strings.Split(key.Key, "/")
+	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
 	if len(parts) == 0 {
 		return key.Key
 	}
@@ -60,11 +60,11 @@ type SecretQuery struct {
 
 	// Finds SecretRef based on key query.
 	// Required
-	Key Query `json:"key"`
+	Key Query `json:"key,omitempty"`
 }
 
 // Query defines how to match string-value data.
 type Query struct {
 	// Uses regexp matching
-	Regexp string `json:"regexp"`
+	Regexp string `json:"regexp,omitempty"`
 }

@@ -55,7 +55,9 @@ func Sync(ctx context.Context,
 	}
 
 	// Define intermediate store
-	store := newKvStore()
+	syncData := make(map[v1alpha1.SecretRef]kvData)
+	syncMu := sync.Mutex{}
+	keyStore := newKvStore()
 
 	// Fetch keys from source and add them to internal store.
 	// Do each fetch in a separate goroutine (there could be API requests).
@@ -67,10 +69,18 @@ func Sync(ctx context.Context,
 				defer extractWg.Done()
 
 				// Fetch keys to store
-				err := store.Add(ctx, source, item)
+				plan, err := keyStore.GetSyncData(ctx, source, item)
 				if err != nil {
 					logrus.WithField("from", item).Warnf("Failed to fetch, reason: %v", err)
+					return
 				}
+
+				// Add to sync data
+				syncMu.Lock()
+				for key, keyData := range plan {
+					syncData[key] = keyData
+				}
+				syncMu.Unlock()
 			}(items[i])
 		}
 		extractWg.Wait()
@@ -78,33 +88,33 @@ func Sync(ctx context.Context,
 
 	// Sync keys between source and dest read from sync queue.
 	// Do sync for each key in a separate goroutine (there will be API requests).
-	var totalCount uint32
 	var successCounter atomic.Uint32
 	{
 		syncWg := sync.WaitGroup{}
-		for i := range dataTo {
+		for key, keyData := range syncData {
 			syncWg.Add(1)
-			go func(ref v1alpha1.StrategyDataTo) {
+			go func(key v1alpha1.SecretRef, keyData kvData) {
 				defer syncWg.Done()
 
-				destKey, err := kvStore.Sync(ctx, dest, ref)
+				err := dest.SetSecret(ctx, key, keyData.value)
 				if err != nil {
 					if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-						logrus.WithField("ref-sync", ref).Warnf("Skipped syncing, reason: %v", err)
+						logrus.WithField("key", key).Warnf("Skipped syncing, reason: %v", err)
 					} else { // otherwise, log error
-						logrus.WithField("ref-sync", ref).Errorf("Failed to sync, reason: %v", err)
+						logrus.WithField("key", key).Errorf("Failed to sync, reason: %v", err)
 					}
 					return
 				}
 
-				logrus.WithField("ref-sync", ref).Infof("Successfully synced key '%s'", destKey.Key)
+				logrus.WithField("key", key).Infof("Successfully synced key '%s'", key.Key)
 				successCounter.Add(1)
-			}(dataTo[i])
+			}(key, keyData)
 		}
 		syncWg.Wait()
 	}
 
 	// Return response
+	totalCount := uint32(len(syncData))
 	successCount := successCounter.Load()
 	return &Status{
 		Total:    totalCount,

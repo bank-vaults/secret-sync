@@ -77,7 +77,7 @@ func (spec *SyncJob) GetAuditLogPath() string {
 type SecretsSelector struct {
 	// Used to define unique name for templating.
 	// Required
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// FromRef selects a secret from a reference.
 	// Optional, but SecretQuery must be provided
@@ -124,7 +124,7 @@ type SyncItem struct {
 	FromSources []SecretsSelector `json:"fromSources,omitempty"`
 
 	// Target defines where the key(s) from sources will be synced on target.
-	Target SyncTarget `json:"target"`
+	Target SyncTarget `json:"target,omitempty"`
 
 	// Template defines how the fetched key(s) will be transformed to create a new
 	// SecretRef that will be synced to target.
