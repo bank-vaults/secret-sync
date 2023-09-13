@@ -40,8 +40,8 @@ func (key *SecretRef) GetPath() []string {
 	return parts[:len(parts)-1]
 }
 
-// GetProperty returns property (domain) pointed by Key, e.g. GetProperty("/path/to/key") returns "key"
-func (key *SecretRef) GetProperty() string {
+// GetName returns (domain) name pointed by Key, e.g. GetName("/path/to/key") returns "key"
+func (key *SecretRef) GetName() string {
 	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
 	if len(parts) == 0 {
 		return key.Key

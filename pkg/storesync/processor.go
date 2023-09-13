@@ -48,7 +48,7 @@ func (p *processor) GetSyncPlan(ctx context.Context, req v1alpha1.SyncRequest) (
 
 		syncValue := fetchedValue
 		if req.Template != nil {
-			syncValue, err = getTemplatedValue(req.Template, fetchedValue)
+			syncValue, err = getTemplatedValue(req.Template, string(fetchedValue))
 			if err != nil {
 				return nil, err
 			}
@@ -75,7 +75,7 @@ func (p *processor) GetSyncPlan(ctx context.Context, req v1alpha1.SyncRequest) (
 			// TODO: Fix template data accessors
 			templateData := make(map[string]string)
 			for key, value := range fetchedSecrets {
-				templateData[key.GetProperty()] = string(value)
+				templateData[key.GetName()] = string(value)
 			}
 			if req.Template == nil {
 				return nil, fmt.Errorf("requires 'template' for 'fromQuery' and 'target.key'")
@@ -90,28 +90,29 @@ func (p *processor) GetSyncPlan(ctx context.Context, req v1alpha1.SyncRequest) (
 			}, nil
 		}
 
-		// Handle FromQuery => KeyPrefix
-		if req.Target.KeyPrefix != nil {
-			syncMap := make(map[v1alpha1.SecretRef][]byte)
-			for key, value := range fetchedSecrets {
-				syncKey := v1alpha1.SecretRef{
-					Key:     *req.Target.KeyPrefix + "/" + key.GetProperty(),
-					Version: key.Version,
-				}
-
-				syncValue := value
-				if req.Template != nil {
-					syncValue, err = getTemplatedValue(req.Template, value)
-					if err != nil {
-						return nil, err
-					}
-				}
-
-				syncMap[syncKey] = syncValue
+		// Handle FromQuery => KeyPrefix or empty
+		syncMap := make(map[v1alpha1.SecretRef][]byte)
+		for key, value := range fetchedSecrets {
+			keyPath := key.Key
+			if req.Target.KeyPrefix != nil {
+				keyPath = *req.Target.KeyPrefix + key.GetName()
 			}
-			return syncMap, nil
+			syncKey := v1alpha1.SecretRef{
+				Key:     keyPath,
+				Version: key.Version,
+			}
+
+			syncValue := value
+			if req.Template != nil {
+				syncValue, err = getTemplatedValue(req.Template, string(value))
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			syncMap[syncKey] = syncValue
 		}
-		return nil, fmt.Errorf("no sources specified")
+		return syncMap, nil
 
 	// FromSources can only sync a single secret
 	case len(req.FromSources) > 0:
@@ -131,7 +132,7 @@ func (p *processor) GetSyncPlan(ctx context.Context, req v1alpha1.SyncRequest) (
 		// TODO: Fix template data accessors
 		templateData := make(map[string]string)
 		for key, value := range fetchedSecrets {
-			templateData[key.GetProperty()] = string(value)
+			templateData[key.GetName()] = string(value)
 		}
 		if req.Template == nil {
 			return nil, fmt.Errorf("requires 'template' for 'fromSources'")

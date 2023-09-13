@@ -17,28 +17,62 @@ sync:
 
   - fromRef:
       key: /source/credentials/example
+    template:
+      rawData: "pre-{{ .Data }}-post"
+
+  - fromRef:
+      key: /source/credentials/example
     target:
       key: /target/credentials/example
 
-  ## 2. Usage: Sync all keys from query
+  ## 2. Usage: Sync all keys from query individually
   - fromQuery:
       path: /source/credentials
       key:
         regexp: (username|password)
-    target: # If not specified, all keys will be synced under the same path
-      keyPrefix: /target/credentials
 
   - fromQuery:
       path: /source/credentials
       key:
         regexp: (username|password)
     template:
+      rawData: "pre-{{ .Data }}-post"
+
+  - fromQuery:
+      path: /source/credentials
+      key:
+        regexp: (username|password)
+    target:
+      keyPrefix: /target/credentials/new/
+
+  ## 3. Usage: Sync all keys from query into one key
+  # TODO: FIX ME
+  - fromQuery:
+      path: /source/credentials
+      key:
+        regexp: (username|password)
+    target:
+      key: /target/credentials/key-from-query
+    template:
       data:
-        # TODO: FIX ME
         username: '{{ index .Data "username" }}'
         password: '{{ index .Data "password" }}'
-    target: # If not specified, all keys will be synced under the same path
-      key: /target/credentials/key-from-query
+
+  ## 3. Usage: Sync all keys from different sources into one key
+  # TODO: FIX ME
+  - fromSources:
+    - name: credentials
+      fromQuery:
+        path: /source/credentials
+        key:
+          regexp: (username|password)
+    target:
+      key: /target/credentials/key-from-sources
+    template:
+      data:
+        username: '{{ index .Data "credentials" }}'
+        password: '{{ index .Data "credentials" }}'
+
 
 #  ## 3. Usage: Sync key from ref with templating
 #  - fromRef:
