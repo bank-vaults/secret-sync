@@ -63,6 +63,24 @@ type SecretQuery struct {
 	Key Query `json:"key,omitempty"`
 }
 
+// SecretSource defines named secret source.
+// This enables named usage in SyncTemplate given as:
+// a) when using FromRef, enables {{ .Data.ref_name }}
+// b) when using FromQuery, enables {{ .Data.query_name.<SECRET_KEY> }}
+type SecretSource struct {
+	// Used to define unique name for templating.
+	// Required
+	Name string `json:"name,omitempty"`
+
+	// FromRef selects a secret from a reference.
+	// Optional, but SecretQuery must be provided
+	FromRef *SecretRef `json:"fromRef,omitempty"`
+
+	// FromQuery selects secret(s) from a query.
+	// Optional, but SecretRef must be provided
+	FromQuery *SecretQuery `json:"fromQuery,omitempty"`
+}
+
 // Query defines how to match string-value data.
 type Query struct {
 	// Uses regexp matching

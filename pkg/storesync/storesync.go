@@ -41,7 +41,7 @@ type Status struct {
 func Sync(ctx context.Context,
 	source v1alpha1.StoreReader,
 	dest v1alpha1.StoreWriter,
-	items []v1alpha1.SyncItem,
+	requests []v1alpha1.SyncRequest,
 ) (*Status, error) {
 	// Validate
 	if source == nil {
@@ -50,38 +50,43 @@ func Sync(ctx context.Context,
 	if dest == nil {
 		return nil, fmt.Errorf("dest is nil")
 	}
-	if len(items) == 0 {
+	if len(requests) == 0 {
 		return nil, fmt.Errorf("nothing to sync")
 	}
 
-	// Define intermediate store
-	syncData := make(map[v1alpha1.SecretRef]kvData)
-	syncMu := sync.Mutex{}
-	keyStore := newKvStore()
-
-	// Fetch keys from source and add them to internal store.
+	// Get sync data for each sync request and .
 	// Do each fetch in a separate goroutine (there could be API requests).
+	syncMu := sync.Mutex{}
+	syncData := make(map[v1alpha1.SecretRef][]byte)
+	processor := newProcessor(source)
 	{
 		extractWg := sync.WaitGroup{}
-		for i := range items {
+		for _, req := range requests {
 			extractWg.Add(1)
-			go func(item v1alpha1.SyncItem) {
+			go func(req v1alpha1.SyncRequest) {
 				defer extractWg.Done()
 
 				// Fetch keys to store
-				plan, err := keyStore.GetSyncData(ctx, source, item)
+				syncPlan, err := processor.GetSyncPlan(ctx, req)
 				if err != nil {
-					logrus.WithField("from", item).Warnf("Failed to fetch, reason: %v", err)
+					logrus.WithField("zfrom", req).Warnf("Failed to fetch, reason: %v", err)
 					return
 				}
 
 				// Add to sync data
 				syncMu.Lock()
-				for key, keyData := range plan {
-					syncData[key] = keyData
+				for key, value := range syncPlan {
+					syncData[key] = value
+
+					// TODO: REMOVE THIS LOG MESSAGE
+					logrus.
+						WithField("zkey", key.Key).
+						WithField("zvalue", string(value)).
+						WithField("zfrom", req).
+						Infof("Added for sync")
 				}
 				syncMu.Unlock()
-			}(items[i])
+			}(req)
 		}
 		extractWg.Wait()
 	}
@@ -91,24 +96,24 @@ func Sync(ctx context.Context,
 	var successCounter atomic.Uint32
 	{
 		syncWg := sync.WaitGroup{}
-		for key, keyData := range syncData {
+		for key, value := range syncData {
 			syncWg.Add(1)
-			go func(key v1alpha1.SecretRef, keyData kvData) {
+			go func(key v1alpha1.SecretRef, value []byte) {
 				defer syncWg.Done()
 
-				err := dest.SetSecret(ctx, key, keyData.value)
+				err := dest.SetSecret(ctx, key, value)
 				if err != nil {
 					if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-						logrus.WithField("key", key).Warnf("Skipped syncing, reason: %v", err)
+						logrus.WithField("zkey", key).Warnf("Skipped syncing, reason: %v", err)
 					} else { // otherwise, log error
-						logrus.WithField("key", key).Errorf("Failed to sync, reason: %v", err)
+						logrus.WithField("zkey", key).Errorf("Failed to sync, reason: %v", err)
 					}
 					return
 				}
 
-				logrus.WithField("key", key).Infof("Successfully synced key '%s'", key.Key)
+				logrus.WithField("zkey", key).Infof("Successfully synced key '%s'", key.Key)
 				successCounter.Add(1)
-			}(key, keyData)
+			}(key, value)
 		}
 		syncWg.Wait()
 	}

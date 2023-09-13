@@ -27,7 +27,7 @@ var (
 	DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
 )
 
-// SyncJob defines a source-to-dest sync request.
+// SyncJob defines overall source-to-target sync strategy.
 // TODO: Add support for auditing.
 type SyncJob struct {
 	// Points to a file where all sync logs should be saved to.
@@ -48,7 +48,7 @@ type SyncJob struct {
 
 	// Used to specify the strategy for secrets sync.
 	// Required
-	Sync []SyncItem `json:"sync,omitempty"`
+	Sync []SyncRequest `json:"sync,omitempty"`
 }
 
 func (spec *SyncJob) GetSchedule() string {
@@ -70,22 +70,35 @@ func (spec *SyncJob) GetAuditLogPath() string {
 	return spec.AuditLogPath
 }
 
-// SecretsSelector defines a secret selector for a given ref or query.
-// This enables named usage in templates given as:
-// a) when using FromRef, enables {{ .Data.ref_name }}
-// b) when using FromQuery, enables {{ .Data.query_name.<SECRET_KEY> }}
-type SecretsSelector struct {
-	// Used to define unique name for templating.
-	// Required
-	Name string `json:"name,omitempty"`
-
+// SyncRequest defines how to fetch, transform, and sync SecretRef(s) from source to target.
+// Only one of FromRef, FromQuery, FromSources can be specified.
+type SyncRequest struct {
 	// FromRef selects a secret from a reference.
-	// Optional, but SecretQuery must be provided
+	// If SyncTarget.Key is nil, it will sync under referenced key.
+	// If SyncTarget.Key is not-nil, it will sync under targeted key.
 	FromRef *SecretRef `json:"fromRef,omitempty"`
 
 	// FromQuery selects secret(s) from a query.
-	// Optional, but SecretRef must be provided
+	// To sync one secret, SyncTarget.Key and Template must be specified.
+	// To sync all secrets, SyncTarget.KeyPrefix must be specified.
 	FromQuery *SecretQuery `json:"fromQuery,omitempty"`
+
+	// FromSources select secret(s) from a multiple sources.
+	// SyncTarget.Key and Template must be specified.
+	FromSources []SecretSource `json:"fromSources,omitempty"`
+
+	// Target defines where the key(s) from sources will be synced on target.
+	// SyncTarget.Key means that only one secret will be synced.
+	// SyncTarget.KeyPrefix means that multiple secrets will be synced.
+	Target SyncTarget `json:"target,omitempty"`
+
+	// Template defines how the fetched key(s) will be transformed to create a new
+	// SecretRef that will be synced to target.
+	// When using FromRef, {{ .Data }} defines given secrets raw value.
+	// When using FromQuery and SyncTarget.Key, specific <KEY> raw values can be accessed via {{ .Data.<KEY> }}.
+	// When using FromQuery and SyncTarget.KeyPrefix, {{ .Data }} defines raw values of query iterator.
+	// When using FromSources, specific <NAMED SOURCE> secret data can be accessed via {{ .Data.<NAMED SOURCE> }}.
+	Template *SyncTemplate `json:"template,omitempty"`
 }
 
 // SyncTarget defines where the secret(s) will be synced to.
@@ -106,27 +119,4 @@ type SyncTemplate struct {
 	// Used to define the resulting secret (map) value. Supports templating.
 	// Optional, but RawData must be provided
 	Data map[string]string `json:"data,omitempty"`
-}
-
-// SyncItem defines how to fetch from source, transform, and sync SecretRef(s) on target.
-type SyncItem struct {
-	// FromRef selects a secret from a reference.
-	// SyncTarget.Key must be specified.
-	FromRef *SecretRef `json:"fromRef,omitempty"`
-
-	// FromQuery selects secret(s) from a query.
-	// To sync one secret, SyncTarget.Key and Template must be specified.
-	// To sync all secrets from query, SyncTarget.KeyPrefix must be specified.
-	FromQuery *SecretQuery `json:"fromQuery,omitempty"`
-
-	// FromSources select secret(s) from a multiple sources.
-	// SyncTarget.Key must be specified.
-	FromSources []SecretsSelector `json:"fromSources,omitempty"`
-
-	// Target defines where the key(s) from sources will be synced on target.
-	Target SyncTarget `json:"target,omitempty"`
-
-	// Template defines how the fetched key(s) will be transformed to create a new
-	// SecretRef that will be synced to target.
-	Template *SyncTemplate `json:"template,omitempty"`
 }
