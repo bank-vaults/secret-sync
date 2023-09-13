@@ -3,8 +3,10 @@ package storesync
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"golang.org/x/sync/errgroup"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -18,6 +20,10 @@ type kvData struct {
 type kvStore struct {
 	mu   sync.RWMutex
 	data map[v1alpha1.SecretRef]kvData
+}
+
+type templateData struct {
+	Data interface{}
 }
 
 func newKvStore() *kvStore {
@@ -176,7 +182,12 @@ func (s *kvStore) GetSyncData(ctx context.Context, source v1alpha1.StoreReader, 
 			return nil, fmt.Errorf("requires 'fromQuery' for 'target.keyPrefix'")
 		}
 		for key, keyData := range sourceData {
-			keysToSync[prefixedKey(key, *target.KeyPrefix)] = keyData
+			tplValue, err := applyOptionalTemplate(item.Template, keyData, templateData{string(keyData.value)})
+			if err != nil {
+				return nil, err
+			}
+			keysToSync[prefixedKey(key, *target.KeyPrefix)] = *tplValue
+			fmt.Printf("SYNCING %v => %s\n", prefixedKey(key, *target.KeyPrefix), string(tplValue.value))
 		}
 		return keysToSync, nil
 
@@ -185,16 +196,32 @@ func (s *kvStore) GetSyncData(ctx context.Context, source v1alpha1.StoreReader, 
 		// Supports FromRef
 		if item.FromRef != nil {
 			for key, keyData := range sourceData {
-				keysToSync[newKey(*target.Key, key.Version)] = keyData
+				tplValue, err := applyOptionalTemplate(item.Template, keyData, templateData{string(keyData.value)})
+				if err != nil {
+					return nil, err
+				}
+				keysToSync[newKey(*target.Key, key.Version)] = *tplValue
+				fmt.Printf("SYNCING %v => %s\n", newKey(*target.Key, key.Version), string(tplValue.value))
 			}
 			return keysToSync, nil
 		}
 
 		// Supports FromQuery
 		if item.FromQuery != nil {
-			if item.Template != nil {
+			if item.Template == nil {
 				return nil, fmt.Errorf("requires 'template' for 'fromQuery' and 'target.key'")
 			}
+			tplData := make(map[string]string)
+			for key, keyData := range sourceData {
+				tplData[key.GetProperty()] = string(keyData.value)
+			}
+			tplValue, err := applyOptionalTemplate(item.Template, kvData{}, templateData{tplData})
+			if err != nil {
+				return nil, err
+			}
+			keysToSync[newKey(*target.Key, nil)] = *tplValue
+			fmt.Printf("SYNCING %v => %s\n", newKey(*target.Key, nil), string(tplValue.value))
+
 			return keysToSync, nil
 		}
 
@@ -213,13 +240,69 @@ func (s *kvStore) GetSyncData(ctx context.Context, source v1alpha1.StoreReader, 
 			return nil, fmt.Errorf("requires at least 'fromRef' for empty 'target'")
 		}
 		for _, keyData := range sourceData {
-			keysToSync[*item.FromRef] = keyData
+			tplValue, err := applyOptionalTemplate(item.Template, keyData, templateData{string(keyData.value)})
+			if err != nil {
+				return nil, err
+			}
+			keysToSync[*item.FromRef] = *tplValue
+			fmt.Printf("SYNCING %v => %s\n", *item.FromRef, string(tplValue.value))
 		}
 		return keysToSync, nil
 	}
 
 	// Synchronize
 	return nil, fmt.Errorf("invalid request")
+}
+
+func applyOptionalTemplate(tpl *v1alpha1.SyncTemplate, keyData kvData, tplData templateData) (*kvData, error) {
+	if tpl == nil {
+		return &keyData, nil
+	}
+
+	// Handle Template.RawData
+	if tpl.RawData != nil {
+		// Apply templates
+		tmpl, err := template.New("template").Parse(*tpl.RawData)
+		if err != nil {
+			return nil, err
+		}
+		buf := new(bytes.Buffer)
+		err = tmpl.Execute(buf, tplData)
+		if err != nil {
+			return nil, err
+		}
+		return &kvData{
+			value: buf.Bytes(),
+		}, nil
+	}
+
+	// Handle Template.Data
+	if len(tpl.Data) == 0 {
+		return &keyData, nil
+	}
+
+	valueMap := make(map[string]string)
+	for key, keyTpl := range tpl.Data {
+		tmpl, err := template.New("template").Parse(keyTpl)
+		if err != nil {
+			return nil, err
+		}
+		buf := new(bytes.Buffer)
+		err = tmpl.Execute(buf, tplData)
+		if err != nil {
+			return nil, err
+		}
+		valueMap[key] = buf.String()
+	}
+
+	rawValue, err := json.Marshal(valueMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kvData{
+		value: rawValue,
+	}, nil
 }
 
 func applyTemplate(tpl string, data interface{}) ([]byte, error) {
@@ -238,7 +321,7 @@ func applyTemplate(tpl string, data interface{}) ([]byte, error) {
 
 func prefixedKey(key v1alpha1.SecretRef, prefix string) v1alpha1.SecretRef {
 	return v1alpha1.SecretRef{
-		Key:     prefix + key.GetProperty(),
+		Key:     strings.Join([]string{prefix, key.GetProperty()}, "/"),
 		Version: key.Version,
 	}
 }

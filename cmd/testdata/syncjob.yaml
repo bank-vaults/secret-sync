@@ -13,28 +13,38 @@ auditLogPath: "path/to/file"
 sync:
   ## 1. Usage: Sync key from ref
   - fromRef:
-      key: source/credentials/example
+      key: /source/credentials/example
 
   - fromRef:
-      key: source/credentials/example
-    target: # If not specified, will be synced under the same key
-      key: credentials/target/example     # synced under /credentials/target/example
-      # key: example                       # synced under /source/credentials/example
+      key: /source/credentials/example
+    target:
+      key: /target/credentials/example
 
   ## 2. Usage: Sync all keys from query
   - fromQuery:
-      path: source/credentials
+      path: /source/credentials
       key:
-        regexp: .*
+        regexp: (username|password)
     target: # If not specified, all keys will be synced under the same path
-      keyPrefix: credentials/target    # synced under /credentials/target/<KEY>
-      # keyPrefix: target-              # synced under /source/credentials/target-<KEY>
+      keyPrefix: /target/credentials
+
+  - fromQuery:
+      path: /source/credentials
+      key:
+        regexp: (username|password)
+    template:
+      data:
+        # TODO: FIX ME
+        username: '{{ index .Data "username" }}'
+        password: '{{ index .Data "password" }}'
+    target: # If not specified, all keys will be synced under the same path
+      key: /target/credentials/key-from-query
 
 #  ## 3. Usage: Sync key from ref with templating
 #  - fromRef:
 #      key: /source/credentials
 #    target:
-#      key: /credentials/target
+#      key: /target/credentials
 #
 #    # Template defines how the secret will be synced to dest store.
 #    # Either "rawData" or "data" should be specified, not both.
@@ -49,7 +59,7 @@ sync:
 #      key:
 #        regexp: .*
 #    target:
-#      keyPrefix: /credentials/target
+#      keyPrefix: /target/credentials
 #    template:
 #      rawData: SECRET-PREFIX-{{ .Data }}
 #
@@ -61,7 +71,7 @@ sync:
 #
 #    flatten: true # "target.key" must be specified when using "flatten"
 #    target:
-#      key: /credentials/target/example
+#      key: /target/credentials/example
 #
 #    template:
 #      data:
@@ -85,7 +95,7 @@ sync:
 #            regexp: .*
 #
 #    target:
-#      key: /credentials/target/example
+#      key: /target/credentials/example
 #
 #    template:
 #      data:
