@@ -92,6 +92,9 @@ type SyncRequest struct {
 	// SyncTarget.KeyPrefix means that multiple secrets will be synced.
 	Target SyncTarget `json:"target,omitempty"`
 
+	// Flatten indicates secrets FromQuery will be synced to a single SyncTarget.Key.
+	Flatten *bool `json:"flatten,omitempty"`
+
 	// Template defines how the fetched key(s) will be transformed to create a new
 	// SecretRef that will be synced to target.
 	// When using FromRef, {{ .Data }} defines given secrets raw value.

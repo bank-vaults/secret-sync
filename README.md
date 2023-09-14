@@ -86,9 +86,10 @@ sync:
       path: /source/credentials/query-data/
       key:
         regexp: (username|password)
+    flatten: true
     target:
       key: /target/example-5
-
+    
     template:
       data:
         user: '{{ .Data.username }}'

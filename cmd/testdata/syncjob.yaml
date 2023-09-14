@@ -53,9 +53,9 @@ sync:
       path: /source/credentials/query-data/
       key:
         regexp: (username|password)
+    flatten: true
     target:
       key: /target/example-5
-
     template:
       data:
         user: '{{ .Data.username }}'
@@ -63,19 +63,19 @@ sync:
 
   ## 6. Usage: Sync single key from multiple sources with templating
   - secretSources:
-    - name: username # Username mapping, available as ".Data.username"
-      secretRef:
-        key: /source/credentials/username
+      - name: username # Username mapping, available as ".Data.username"
+        secretRef:
+          key: /source/credentials/username
 
-    - name: password # Password mapping, available as ".Data.password"
-      secretRef:
-        key: /source/credentials/password
+      - name: password # Password mapping, available as ".Data.password"
+        secretRef:
+          key: /source/credentials/password
 
-    - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
-      secretQuery:
-        path: /source/credentials
-        key:
-          regexp: .*
+      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
+        secretQuery:
+          path: /source/credentials
+          key:
+            regexp: .*
 
     target:
       key: /target/example-6

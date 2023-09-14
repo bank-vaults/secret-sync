@@ -99,6 +99,10 @@ func (p *processor) GetSyncPlan(ctx context.Context, reqID int, req v1alpha1.Syn
 
 		// Handle FromQuery => Key
 		if req.Target.Key != nil {
+			if req.Flatten == nil || !*req.Flatten {
+				return nil, fmt.Errorf("requires 'flatten' for 'fromQuery' and 'target.key'")
+			}
+
 			syncRef := v1alpha1.SecretRef{
 				Key:     *req.Target.Key,
 				Version: nil,
@@ -126,6 +130,10 @@ func (p *processor) GetSyncPlan(ctx context.Context, reqID int, req v1alpha1.Syn
 		}
 
 		// Handle FromQuery => KeyPrefix or empty
+		if req.Flatten != nil && *req.Flatten {
+			return nil, fmt.Errorf("cannot use 'flatten' for 'fromQuery' and 'target.key'")
+		}
+
 		syncMap := make(map[v1alpha1.SecretRef]SyncPlan)
 		for ref, resp := range fetchResps {
 			syncRef := ref
