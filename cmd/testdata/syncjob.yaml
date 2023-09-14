@@ -11,43 +11,90 @@ auditLogPath: "path/to/file"
 
 ## Defines how the secrets will be synced
 sync:
-  ## 1. Usage: Sync key from ref
-  - fromRef:
+  ## 1. Usage: Sync key from ref (all possibilities)
+  - secretRef:
       key: /source/credentials/example
 
-  - fromRef:
+  - secretRef:
       key: /source/credentials/example
     template:
       rawData: "pre-{{ .Data }}-post"
 
-  - fromRef:
+  - secretRef:
+      key: /source/credentials/example
+    template:
+      data:
+        auth: "example/pre-{{ .Data }}-post"
+
+  - secretRef:
       key: /source/credentials/example
     target:
       key: /target/credentials/example
 
-  ## 2. Usage: Sync all keys from query individually
-  - fromQuery:
+  - secretRef:
+      key: /source/credentials/example
+    target:
+      key: /target/credentials/example
+    template:
+      rawData: "pre-{{ .Data }}-post"
+
+  - secretRef:
+      key: /source/credentials/example
+    target:
+      key: /target/credentials/example
+    template:
+      data:
+        auth: "example/pre-{{ .Data }}-post"
+
+  ## 2. Usage: Sync all keys from query individually (all possibilities)
+  - secretQuery:
       path: /source/credentials
       key:
         regexp: (username|password)
 
-  - fromQuery:
+  - secretQuery:
       path: /source/credentials
       key:
         regexp: (username|password)
     template:
-      rawData: "pre-{{ .Data }}-post"
+      auth: "example/pre-{{ .Data }}-post"
 
-  - fromQuery:
+  - secretQuery:
+      path: /source/credentials
+      key:
+        regexp: (username|password)
+    template:
+      data:
+        newKey: "pre-{{ .Data }}-post"
+
+  - secretQuery:
       path: /source/credentials
       key:
         regexp: (username|password)
     target:
       keyPrefix: /target/credentials/new/
 
-  ## 3. Usage: Sync all keys from query into one key
-  # TODO: FIX ME
-  - fromQuery:
+  - secretQuery:
+      path: /source/credentials
+      key:
+        regexp: (username|password)
+    target:
+      keyPrefix: /target/credentials/new/
+    template:
+      auth: "example/pre-{{ .Data }}-post"
+
+  - secretQuery:
+      path: /source/credentials
+      key:
+        regexp: (username|password)
+    target:
+      keyPrefix: /target/credentials/new/
+    template:
+      data:
+        newKey: "pre-{{ .Data }}-post"
+
+  ## 3. Usage: Sync all keys from query into one key (all possibilities)
+  - secretQuery:
       path: /source/credentials
       key:
         regexp: (username|password)
@@ -55,14 +102,17 @@ sync:
       key: /target/credentials/key-from-query
     template:
       data:
-        username: '{{ index .Data "username" }}'
-        password: '{{ index .Data "password" }}'
+        username: '{{ .Data.username }}'
+        password: '{{ .Data.password }}'
 
-  ## 3. Usage: Sync all keys from different sources into one key
-  # TODO: FIX ME
-  - fromSources:
+  ## 4. Usage: Sync all keys from different sources into one key (all possibilities)
+  - secretSources:
+    - name: example
+      secretRef:
+        key: /source/credentials/example
+
     - name: credentials
-      fromQuery:
+      secretQuery:
         path: /source/credentials
         key:
           regexp: (username|password)
@@ -70,69 +120,6 @@ sync:
       key: /target/credentials/key-from-sources
     template:
       data:
-        username: '{{ index .Data "credentials" }}'
-        password: '{{ index .Data "credentials" }}'
-
-
-#  ## 3. Usage: Sync key from ref with templating
-#  - fromRef:
-#      key: /source/credentials
-#    target:
-#      key: /target/credentials
-#
-#    # Template defines how the secret will be synced to dest store.
-#    # Either "rawData" or "data" should be specified, not both.
-#    template:
-#      rawData: {{ .Data }}  # Save as raw (accepts multiline string)
-#      data:                 # Save as map (accepts nested values)
-#        example: {{ .Data }}
-#
-#  ## 4. Usage: Sync all keys from query with templating
-#  - fromQuery:
-#      path: /source/credentials
-#      key:
-#        regexp: .*
-#    target:
-#      keyPrefix: /target/credentials
-#    template:
-#      rawData: SECRET-PREFIX-{{ .Data }}
-#
-#  ## 5. Usage: Sync single key from query with templating
-#  - fromQuery:
-#      path: /source/credentials
-#      key:
-#        regexp: (username|password)
-#
-#    flatten: true # "target.key" must be specified when using "flatten"
-#    target:
-#      key: /target/credentials/example
-#
-#    template:
-#      data:
-#        user: {{ .Data.username }}
-#        pass: {{ .Data.password }}
-#
-#  ## 6. Usage: Sync single key from multiple sources with templating
-#  - sources:
-#      - name: username # Username mapping, available as ".Data.username"
-#        fromRef:
-#          key: /source/credentials/username
-#
-#      - name: password # Password mapping, available as ".Data.password"
-#        fromRef:
-#          key: /source/credentials/password
-#
-#      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
-#        fromQuery:
-#          path: /source/credentials
-#          key:
-#            regexp: .*
-#
-#    target:
-#      key: /target/credentials/example
-#
-#    template:
-#      data:
-#        username: {{ .Data.username }}
-#        password: {{ .Data.password }}
-#        userpass: {{ .Data.dynamic_query.username }}/{{ .Data.dynamic_query.password }}
+        example:  '{{ .Data.example }}'
+        username: '{{ .Data.credentials.username }}'
+        password: '{{ .Data.credentials.password }}'

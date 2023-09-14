@@ -74,11 +74,11 @@ type SecretSource struct {
 
 	// FromRef selects a secret from a reference.
 	// Optional, but SecretQuery must be provided
-	FromRef *SecretRef `json:"fromRef,omitempty"`
+	FromRef *SecretRef `json:"secretRef,omitempty"`
 
 	// FromQuery selects secret(s) from a query.
 	// Optional, but SecretRef must be provided
-	FromQuery *SecretQuery `json:"fromQuery,omitempty"`
+	FromQuery *SecretQuery `json:"secretQuery,omitempty"`
 }
 
 // Query defines how to match string-value data.

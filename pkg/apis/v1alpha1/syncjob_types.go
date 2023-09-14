@@ -76,16 +76,16 @@ type SyncRequest struct {
 	// FromRef selects a secret from a reference.
 	// If SyncTarget.Key is nil, it will sync under referenced key.
 	// If SyncTarget.Key is not-nil, it will sync under targeted key.
-	FromRef *SecretRef `json:"fromRef,omitempty"`
+	FromRef *SecretRef `json:"secretRef,omitempty"`
 
 	// FromQuery selects secret(s) from a query.
 	// To sync one secret, SyncTarget.Key and Template must be specified.
 	// To sync all secrets, SyncTarget.KeyPrefix must be specified.
-	FromQuery *SecretQuery `json:"fromQuery,omitempty"`
+	FromQuery *SecretQuery `json:"secretQuery,omitempty"`
 
 	// FromSources select secret(s) from a multiple sources.
 	// SyncTarget.Key and Template must be specified.
-	FromSources []SecretSource `json:"fromSources,omitempty"`
+	FromSources []SecretSource `json:"secretSources,omitempty"`
 
 	// Target defines where the key(s) from sources will be synced on target.
 	// SyncTarget.Key means that only one secret will be synced.

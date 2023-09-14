@@ -57,36 +57,29 @@ func Sync(ctx context.Context,
 	// Get sync data for each sync request and .
 	// Do each fetch in a separate goroutine (there could be API requests).
 	syncMu := sync.Mutex{}
-	syncData := make(map[v1alpha1.SecretRef][]byte)
+	syncPlan := make(map[v1alpha1.SecretRef]SyncPlan)
 	processor := newProcessor(source)
 	{
 		extractWg := sync.WaitGroup{}
-		for _, req := range requests {
+		for id, req := range requests {
 			extractWg.Add(1)
-			go func(req v1alpha1.SyncRequest) {
+			go func(id int, req v1alpha1.SyncRequest) {
 				defer extractWg.Done()
 
 				// Fetch keys to store
-				syncPlan, err := processor.GetSyncPlan(ctx, req)
+				plans, err := processor.GetSyncPlan(ctx, id, req)
 				if err != nil {
-					logrus.WithField("zfrom", req).Warnf("Failed to fetch, reason: %v", err)
+					logrus.WithField("z-req", req).Warnf("Failed to fetch reqID = %d sync plan, reason: %v", id, err)
 					return
 				}
 
 				// Add to sync data
 				syncMu.Lock()
-				for key, value := range syncPlan {
-					syncData[key] = value
-
-					// TODO: REMOVE THIS LOG MESSAGE
-					logrus.
-						WithField("zkey", key.Key).
-						WithField("zvalue", string(value)).
-						WithField("zfrom", req).
-						Infof("Added for sync")
+				for ref, plan := range plans {
+					syncPlan[ref] = plan
 				}
 				syncMu.Unlock()
-			}(req)
+			}(id, req)
 		}
 		extractWg.Wait()
 	}
@@ -96,30 +89,33 @@ func Sync(ctx context.Context,
 	var successCounter atomic.Uint32
 	{
 		syncWg := sync.WaitGroup{}
-		for key, value := range syncData {
+		for ref, plan := range syncPlan {
 			syncWg.Add(1)
-			go func(key v1alpha1.SecretRef, value []byte) {
+			go func(ref v1alpha1.SecretRef, plan SyncPlan) {
 				defer syncWg.Done()
 
-				err := dest.SetSecret(ctx, key, value)
+				err := dest.SetSecret(ctx, ref, plan.Data)
 				if err != nil {
 					if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-						logrus.WithField("zkey", key).Warnf("Skipped syncing, reason: %v", err)
+						logrus.WithField("z-req", plan.Request).
+							Warnf("Skipped syncing reqID = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
 					} else { // otherwise, log error
-						logrus.WithField("zkey", key).Errorf("Failed to sync, reason: %v", err)
+						logrus.WithField("z-req", plan.Request).
+							Errorf("Failed to sync reqID = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
 					}
 					return
 				}
 
-				logrus.WithField("zkey", key).Infof("Successfully synced key '%s'", key.Key)
+				logrus.WithField("z-req", plan.Request).
+					Infof("Successfully synced reqID = %d for key %s", plan.RequestID, ref.Key /* , string(plan.Data) */)
 				successCounter.Add(1)
-			}(key, value)
+			}(ref, plan)
 		}
 		syncWg.Wait()
 	}
 
 	// Return response
-	totalCount := uint32(len(syncData))
+	totalCount := uint32(len(syncPlan))
 	successCount := successCounter.Load()
 	return &Status{
 		Total:    totalCount,

@@ -23,6 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO: Expand tests
+
 func TestSync(t *testing.T) {
 	syncCmd := NewSyncCmd()
 	syncCmd.SetArgs([]string{
