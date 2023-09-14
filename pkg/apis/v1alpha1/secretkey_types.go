@@ -16,80 +16,73 @@ package v1alpha1
 
 import "strings"
 
-// SecretKey defines Provider key params.
-// TODO: Add support for different encodings (to decode when fetching).
-type SecretKey struct {
+// SecretRef defines Provider reference key.
+// TODO: Add support for version
+// TODO: Add support for map field selector
+// TODO: Add support for encoding
+type SecretRef struct {
 	// Key points to a specific key in store.
 	// Format "path/to/key"
 	// Required
-	Key string `json:"key"`
+	Key string `json:"key,omitempty"`
 
 	// Version points to specific key version.
-	// TODO: Add support on providers
 	// Optional
-	Version string `json:"version"`
+	Version *string `json:"version,omitempty"`
 }
 
-// GetPath returns path pointed by Key, e.g. GetPath("path/to/key") returns ["path", "to"]
-func (key *SecretKey) GetPath() []string {
-	parts := strings.Split(key.Key, "/")
+// GetPath returns path pointed by Key, e.g. GetPath("/path/to/key") returns ["path", "to"]
+func (key *SecretRef) GetPath() []string {
+	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
 	if len(parts) == 0 {
 		return nil
 	}
 	return parts[:len(parts)-1]
 }
 
-// GetProperty returns property (domain) pointed by Key, e.g. GetProperty("path/to/key") returns "key"
-func (key *SecretKey) GetProperty() string {
-	parts := strings.Split(key.Key, "/")
+// GetName returns (domain) name pointed by Key, e.g. GetName("/path/to/key") returns "key"
+func (key *SecretRef) GetName() string {
+	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
 	if len(parts) == 0 {
 		return key.Key
 	}
 	return parts[len(parts)-1]
 }
 
-// SecretKeyFromRef defines SecretKey data to fetch and transform from referenced store.
-// TODO: Add support for overriding default SyncJob source.
-type SecretKeyFromRef struct {
-	// Used to reference a static secret key.
-	// Optional
-	SecretKey *SecretKey `json:"secret,omitempty"`
-
-	// Used to find secret key based on query.
-	// Ignored if SecretKey is specified.
-	// Optional
-	Query *SecretKeyQuery `json:"query,omitempty"`
-
-	// Used to transform secret keys after getting them from the Provider.
-	// Multiple KeyTransform operations will be applied in FIFO order.
-	// Optional
-	KeyTransform []SecretKeyTransform `json:"key-transform,omitempty"`
-}
-
-type SecretKeyQuery struct {
-	// A root path to start the find operations.
+// SecretQuery defines how to query Provider to obtain SecretRef(s).
+// TODO: Add support for version
+// TODO: Add support for map field selector
+// TODO: Add support for encoding
+type SecretQuery struct {
+	// A root path to start the query operations.
 	// Optional
 	Path *string `json:"path,omitempty"`
 
-	// Finds secret based on the regex key.
-	// Optional
-	Key *RegexpQuery `json:"key,omitempty"`
+	// Finds SecretRef based on key query.
+	// Required
+	Key Query `json:"key,omitempty"`
 }
 
-type SecretKeyTransform struct {
-	// Used to transform SecretKey with regular expressions.
-	// The resulting SecretKey will be the output of a regexp.ReplaceAll operation.
-	Regexp *RegexpTransform `json:"regexp,omitempty"`
+// SecretSource defines named secret source.
+// This enables named usage in SyncTemplate given as:
+// a) when using FromRef, enables {{ .Data.ref_name }}
+// b) when using FromQuery, enables {{ .Data.query_name.<SECRET_KEY> }}
+type SecretSource struct {
+	// Used to define unique name for templating.
+	// Required
+	Name string `json:"name,omitempty"`
+
+	// FromRef selects a secret from a reference.
+	// Optional, but SecretQuery must be provided
+	FromRef *SecretRef `json:"secretRef,omitempty"`
+
+	// FromQuery selects secret(s) from a query.
+	// Optional, but SecretRef must be provided
+	FromQuery *SecretQuery `json:"secretQuery,omitempty"`
 }
 
-type RegexpQuery struct {
+// Query defines how to match string-value data.
+type Query struct {
+	// Uses regexp matching
 	Regexp string `json:"regexp,omitempty"`
-}
-
-type RegexpTransform struct {
-	// Used to define the regular expression of a re.Compiler.
-	Source string `json:"source"`
-
-	// Used to define the target pattern of a ReplaceAll operation.
-	Target string `json:"target"`
 }

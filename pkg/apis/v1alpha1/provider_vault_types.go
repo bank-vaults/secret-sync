@@ -14,12 +14,12 @@
 
 package v1alpha1
 
-// SecretStoreProviderVault defines provider for a Vault.
-type SecretStoreProviderVault struct {
-	Address        string `json:"address"`
-	UnsealKeysPath string `json:"unseal-keys-path"`
-	Role           string `json:"role"`
-	AuthPath       string `json:"auth-path"`
-	TokenPath      string `json:"token-path"`
-	Token          string `json:"token"` // TODO: Add support for reading this from a k8s secret
+// VaultProvider uses Hashicorp Vault as a backend.
+type VaultProvider struct {
+	Address   string `json:"address"`
+	StorePath string `json:"storePath"`
+	Role      string `json:"role"`
+	AuthPath  string `json:"authPath"`
+	TokenPath string `json:"tokenPath"`
+	Token     string `json:"token"`
 }

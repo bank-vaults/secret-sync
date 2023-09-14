@@ -25,7 +25,7 @@ import (
 )
 
 // NewClient creates a store client for provided store backend config.
-func NewClient(ctx context.Context, backend *v1alpha1.SecretStoreProvider) (v1alpha1.StoreClient, error) {
+func NewClient(ctx context.Context, backend *v1alpha1.ProviderBackend) (v1alpha1.StoreClient, error) {
 	// Get provider
 	provider, err := v1alpha1.GetProvider(backend)
 	if err != nil {

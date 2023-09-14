@@ -25,7 +25,7 @@ import (
 
 type Provider struct{}
 
-func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreProvider) (v1alpha1.StoreClient, error) {
+func (p *Provider) NewClient(_ context.Context, backend v1alpha1.ProviderBackend) (v1alpha1.StoreClient, error) {
 	vaultCfg := backend.Vault
 	apiClient, err := vault.NewClientWithOptions(
 		vault.ClientURL(vaultCfg.Address),
@@ -39,11 +39,11 @@ func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreProv
 
 	return &client{
 		apiClient:  apiClient,
-		apiKeyPath: vaultCfg.UnsealKeysPath,
+		apiKeyPath: vaultCfg.StorePath,
 	}, nil
 }
 
-func (p *Provider) Validate(backend v1alpha1.SecretStoreProvider) error {
+func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
 	vaultCfg := backend.Vault
 	if vaultCfg == nil {
 		return fmt.Errorf("empty Vault config")
@@ -51,8 +51,8 @@ func (p *Provider) Validate(backend v1alpha1.SecretStoreProvider) error {
 	if vaultCfg.Address == "" {
 		return fmt.Errorf("empty .Vault.Address")
 	}
-	if vaultCfg.UnsealKeysPath == "" {
-		return fmt.Errorf("empty .Vault.UnsealKeysPath")
+	if vaultCfg.StorePath == "" {
+		return fmt.Errorf("empty .Vault.StorePath")
 	}
 	if vaultCfg.AuthPath == "" {
 		return fmt.Errorf("empty .Vault.AuthPath")
@@ -64,7 +64,7 @@ func (p *Provider) Validate(backend v1alpha1.SecretStoreProvider) error {
 }
 
 func init() {
-	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreProvider{
-		Vault: &v1alpha1.SecretStoreProviderVault{},
+	v1alpha1.Register(&Provider{}, &v1alpha1.ProviderBackend{
+		Vault: &v1alpha1.VaultProvider{},
 	})
 }

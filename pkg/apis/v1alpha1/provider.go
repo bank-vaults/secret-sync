@@ -24,29 +24,37 @@ var ErrKeyNotFound = errors.New("secret key not found")
 // Provider defines methods to manage store clients.
 type Provider interface {
 	// NewClient creates a new secret StoreClient for provided backend.
-	NewClient(ctx context.Context, backend SecretStoreProvider) (StoreClient, error)
+	NewClient(ctx context.Context, backend ProviderBackend) (StoreClient, error)
 
 	// Validate checks if the provided backend is valid.
-	Validate(backend SecretStoreProvider) error
+	Validate(backend ProviderBackend) error
 }
 
 // StoreReader implements read ops for a secret backend. Must support concurrent calls.
 type StoreReader interface {
 	// GetSecret returns a single secret fetched from secret store.
-	GetSecret(ctx context.Context, key SecretKey) ([]byte, error)
+	GetSecret(ctx context.Context, key SecretRef) ([]byte, error)
 
 	// ListSecretKeys lists all keys matching the query from secret store.
-	ListSecretKeys(ctx context.Context, query SecretKeyQuery) ([]SecretKey, error)
+	ListSecretKeys(ctx context.Context, query SecretQuery) ([]SecretRef, error)
 }
 
 // StoreWriter implements write ops for a secret backend. Must support concurrent calls.
 type StoreWriter interface {
 	// SetSecret writes data to a key in a secret store.
-	SetSecret(ctx context.Context, key SecretKey, value []byte) error
+	SetSecret(ctx context.Context, key SecretRef, value []byte) error
 }
 
 // StoreClient unifies read and write ops for a specific secret backend.
 type StoreClient interface {
 	StoreReader
 	StoreWriter
+}
+
+// ProviderBackend defines the which backend should be used for Provider.
+// Only one can be specified.
+type ProviderBackend struct {
+	Vault *VaultProvider `json:"vault,omitempty"`
+
+	File *FileProvider `json:"file,omitempty"`
 }

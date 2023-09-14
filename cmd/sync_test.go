@@ -23,11 +23,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TODO: Expand tests
+
 func TestSync(t *testing.T) {
 	syncCmd := NewSyncCmd()
 	syncCmd.SetArgs([]string{
-		"--source", storeFile(t, "testdata/source"),
-		"--dest", storeFile(t, filepath.Join(os.TempDir(), "dest")),
+		"--source", storeFile(t, "testdata"),
+		"--target", storeFile(t, filepath.Join(os.TempDir(), "target")),
 		"--sync", "testdata/syncjob.yaml",
 		"--once",
 	})
@@ -49,10 +51,8 @@ func storeFile(t *testing.T, dirPath string) string {
 
 	// Write
 	_, err = tmpFile.Write([]byte(fmt.Sprintf(`
-permissions: ReadWrite
-provider:
-  file:
-    dir-path: %q
+file:
+  dirPath: %q
 `, path)))
 	assert.Nil(t, err)
 

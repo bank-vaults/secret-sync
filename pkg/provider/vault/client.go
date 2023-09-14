@@ -17,6 +17,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/bank-vaults/vault-sdk/vault"
@@ -30,7 +31,7 @@ type client struct {
 	apiKeyPath string
 }
 
-func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, error) {
+func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, error) {
 	// Get secret from API
 	keyPath := pathForKey(key)
 	response, err := c.apiClient.RawClient().Logical().Read(fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath))
@@ -52,16 +53,16 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretKey) ([]byte, e
 		return nil, fmt.Errorf("api get request findind data: %w", err)
 	}
 
-	// Get property
-	property := key.GetProperty()
-	propertyData, ok := data[property]
+	// Get name
+	keyName := key.GetName()
+	keyData, ok := data[keyName]
 	if !ok {
-		return nil, fmt.Errorf("could not find property %s for in get response", property)
+		return nil, fmt.Errorf("could not find %s for in get response", keyName)
 	}
-	return []byte(propertyData.(string)), nil
+	return []byte(keyData.(string)), nil
 }
 
-func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery) ([]v1alpha1.SecretKey, error) {
+func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) ([]v1alpha1.SecretRef, error) {
 	// Get relative path to dir
 	queryPath := ""
 	if query.Path != nil {
@@ -88,14 +89,21 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 		return nil, fmt.Errorf("api list returned invalid data")
 	}
 
-	// Extract keys from response.
-	// A key in a KV store can be either a secret or a dir (marked by a suffix '/').
-	var result []v1alpha1.SecretKey
+	// Extract keys from response
+	var result []v1alpha1.SecretRef
 	for _, listKey := range listSlice {
-		keyPath := fmt.Sprintf("%s%v", queryPath, listKey)
-		if !strings.HasSuffix(keyPath, "/") { // key
-			result = append(result, v1alpha1.SecretKey{
-				Key: keyPath,
+		// Extract key from path
+		key := fmt.Sprintf("%s%v", queryPath, listKey)
+
+		// Skip values in KV store that are not keys (marked by a suffix '/').
+		if strings.HasSuffix(key, "/") {
+			continue
+		}
+
+		// Add key if it matches regexp query
+		if matches, _ := regexp.MatchString(query.Key.Regexp, key); matches {
+			result = append(result, v1alpha1.SecretRef{
+				Key: key,
 			})
 		}
 	}
@@ -103,14 +111,14 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretKeyQuery
 	return result, nil
 }
 
-func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []byte) error {
+func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []byte) error {
 	// Write secret to API
 	keyPath := pathForKey(key)
 	_, err := c.apiClient.RawClient().Logical().Write(
 		fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath),
 		map[string]interface{}{
 			"data": map[string]interface{}{
-				key.GetProperty(): value,
+				key.GetName(): value,
 			},
 		},
 	)
@@ -126,7 +134,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretKey, value []by
 // It could (potentially) be useful.
 // DEPRECATED
 //nolint
-func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretKey, error) {
+func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) {
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))
 	if err != nil {
@@ -150,11 +158,11 @@ func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.Sec
 	// A key in a KV store can be either a secret or a dir (marked by a suffix '/').
 	// For dirs, keep recursively listing them and adding their result results.
 	// TODO: Track changes to Vault API https://github.com/hashicorp/vault/issues/5275.
-	var result []v1alpha1.SecretKey
+	var result []v1alpha1.SecretRef
 	for _, listKey := range listSlice {
 		subKey := fmt.Sprintf("%s%v", path, listKey)
 		if !strings.HasSuffix(subKey, "/") { // key
-			result = append(result, v1alpha1.SecretKey{
+			result = append(result, v1alpha1.SecretRef{
 				Key: subKey,
 			})
 		} else { // dir
@@ -172,6 +180,6 @@ func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.Sec
 	return result, nil
 }
 
-func pathForKey(key v1alpha1.SecretKey) string {
-	return strings.Join(append(key.GetPath(), key.GetProperty()), "/")
+func pathForKey(key v1alpha1.SecretRef) string {
+	return strings.Join(append(key.GetPath(), key.GetName()), "/")
 }

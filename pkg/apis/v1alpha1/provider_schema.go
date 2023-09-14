@@ -23,9 +23,8 @@ import (
 var providers = map[string]Provider{}
 var providerMu = sync.RWMutex{}
 
-// Register a secret store backend type. Panics if a backend with for the same
-// store is already registered.
-func Register(provider Provider, backend *SecretStoreProvider) {
+// Register a Provider for a given backend. Panics if a given backend is already registered.
+func Register(provider Provider, backend *ProviderBackend) {
 	providerName, err := getProviderName(backend)
 	if err != nil {
 		panic(fmt.Errorf("error registering secret backend: %w", err))
@@ -40,8 +39,8 @@ func Register(provider Provider, backend *SecretStoreProvider) {
 	providers[providerName] = provider
 }
 
-// GetProvider returns the provider for SecretStoreSpec.
-func GetProvider(backend *SecretStoreProvider) (Provider, error) {
+// GetProvider returns the Provider for given ProviderBackend.
+func GetProvider(backend *ProviderBackend) (Provider, error) {
 	providerName, err := getProviderName(backend)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find store backend: %w", err)
@@ -58,9 +57,9 @@ func GetProvider(backend *SecretStoreProvider) (Provider, error) {
 	return provider, nil
 }
 
-// getProviderName returns the name of the configured provider or an error if the
-// provider is invalid/not configured.
-func getProviderName(backend *SecretStoreProvider) (string, error) {
+// getProviderName returns the name of the configured ProviderBackend or an error if the
+// Provider is invalid/not configured.
+func getProviderName(backend *ProviderBackend) (string, error) {
 	if backend == nil {
 		return "", fmt.Errorf("no StoreConfig provided")
 	}

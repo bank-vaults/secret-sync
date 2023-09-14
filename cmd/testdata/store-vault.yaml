@@ -1,9 +1,7 @@
-permissions: ReadWrite
-provider:
-  vault:
-    address: http://0.0.0.0:8200
-    unseal-keys-path: secret
-    role: ''
-    auth-path: userpass
-    token-path: ''
-    token: root
+vault:
+  address: http://0.0.0.0:8200
+  storePath: secret
+  role: ''
+  authPath: userpass
+  tokenPath: ''
+  token: root
