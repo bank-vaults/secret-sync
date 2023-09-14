@@ -29,8 +29,8 @@ func TestSync(t *testing.T) {
 	syncCmd := NewSyncCmd()
 	syncCmd.SetArgs([]string{
 		"--source", storeFile(t, "testdata"),
-		"--target", storeFile(t, filepath.Join(os.TempDir(), "dest")),
-		"--plan", "testdata/syncjob.yaml",
+		"--target", storeFile(t, filepath.Join(os.TempDir(), "target")),
+		"--sync", "testdata/syncjob.yaml",
 		"--once",
 	})
 	err := syncCmd.Execute()

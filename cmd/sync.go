@@ -51,14 +51,14 @@ func NewSyncCmd() *cobra.Command {
 	cobraCmd.Flags().StringVar(&cmd.flagDstFile, "target", "", "Target store config file. "+
 		"This is the store where the data will be synced to.")
 	_ = cobraCmd.MarkFlagRequired("target")
-	cobraCmd.Flags().StringVar(&cmd.flagPlanFile, "plan", "", "Sync job config file. "+
+	cobraCmd.Flags().StringVar(&cmd.flagSyncFile, "sync", "", "Sync job config file. "+
 		"This is the strategy sync template.")
-	_ = cobraCmd.MarkFlagRequired("plan")
+	_ = cobraCmd.MarkFlagRequired("sync")
 
-	cobraCmd.Flags().StringVar(&cmd.flagSync, "sync", v1alpha1.DefaultSyncJobSchedule,
-		"Synchronization CRON schedule. Either --sync or --once should be specified.")
+	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", v1alpha1.DefaultSyncJobSchedule,
+		"Sync on CRON schedule. Either --schedule or --once should be specified.")
 	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false,
-		"Synchronize once and exit. Either --sync or --once should be specified.")
+		"Synchronize once and exit. Either --schedule or --once should be specified.")
 
 	return cobraCmd
 }
@@ -66,12 +66,12 @@ func NewSyncCmd() *cobra.Command {
 type syncCmd struct {
 	flgSrcFile   string
 	flagDstFile  string
-	flagPlanFile string
-	flagSync     string
+	flagSyncFile string
+	flagSchedule string
 	flagOnce     bool
 
 	source v1alpha1.StoreReader
-	dest   v1alpha1.StoreWriter
+	target v1alpha1.StoreWriter
 	sync   *v1alpha1.SyncJob
 }
 
@@ -88,26 +88,26 @@ func (cmd *syncCmd) init() error {
 		return err
 	}
 
-	// Init dest
-	destStore, err := loadStore(cmd.flagDstFile)
+	// Init target
+	targetStore, err := loadStore(cmd.flagDstFile)
 	if err != nil {
 		return err
 	}
-	cmd.dest, err = provider.NewClient(context.Background(), destStore)
+	cmd.target, err = provider.NewClient(context.Background(), targetStore)
 	if err != nil {
 		return err
 	}
 
 	// Init sync request by loading from file and overriding from cli
-	cmd.sync, err = loadStrategy(cmd.flagPlanFile)
+	cmd.sync, err = loadStrategy(cmd.flagSyncFile)
 	if err != nil {
 		return err
 	}
 	if cmd.flagOnce {
 		cmd.sync.RunOnce = cmd.flagOnce
 	}
-	if cmd.flagSync != "" {
-		cmd.sync.Schedule = cmd.flagSync
+	if cmd.flagSchedule != "" {
+		cmd.sync.Schedule = cmd.flagSchedule
 	}
 
 	return nil
@@ -116,7 +116,7 @@ func (cmd *syncCmd) init() error {
 func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	// Run once
 	if syncReq.RunOnce {
-		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Sync)
+		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.target, syncReq.Sync)
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 		select {
 		case <-cronTicker.C:
 			logrus.Info("Handling a new sync request...")
-			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.dest, syncReq.Sync)
+			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.target, syncReq.Sync)
 			if err != nil {
 				return err
 			}

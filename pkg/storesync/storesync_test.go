@@ -106,7 +106,7 @@ package storesync_test
 //	client, err := provider.NewClient(context.Background(), &v1alpha1.ProviderBackend{
 //		Vault: &v1alpha1.VaultProvider{
 //			Address:        addr,
-//			UnsealKeysPath: "secret",
+//			storePath: "secret",
 //			AuthPath:       "userpass",
 //			Token:          token,
 //		},

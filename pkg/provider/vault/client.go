@@ -133,7 +133,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []by
 // Not used since it has high memory footprint and does not handle search.
 // It could (potentially) be useful.
 // DEPRECATED
-// nolint
+//nolint
 func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) {
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))

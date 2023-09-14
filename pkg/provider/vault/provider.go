@@ -39,7 +39,7 @@ func (p *Provider) NewClient(_ context.Context, backend v1alpha1.ProviderBackend
 
 	return &client{
 		apiClient:  apiClient,
-		apiKeyPath: vaultCfg.UnsealKeysPath,
+		apiKeyPath: vaultCfg.StorePath,
 	}, nil
 }
 
@@ -51,8 +51,8 @@ func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
 	if vaultCfg.Address == "" {
 		return fmt.Errorf("empty .Vault.Address")
 	}
-	if vaultCfg.UnsealKeysPath == "" {
-		return fmt.Errorf("empty .Vault.UnsealKeysPath")
+	if vaultCfg.StorePath == "" {
+		return fmt.Errorf("empty .Vault.StorePath")
 	}
 	if vaultCfg.AuthPath == "" {
 		return fmt.Errorf("empty .Vault.AuthPath")

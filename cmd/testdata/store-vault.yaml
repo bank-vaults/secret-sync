@@ -1,6 +1,6 @@
 vault:
   address: http://0.0.0.0:8200
-  unsealKeysPath: secret
+  storePath: secret
   role: ''
   authPath: userpass
   tokenPath: ''
