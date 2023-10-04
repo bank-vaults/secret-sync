@@ -14,7 +14,7 @@
 
 package v1alpha1
 
-// FileProvider uses OS dir and files as a backend.
-type FileProvider struct {
-	DirPath string `json:"dirPath"`
+// LocalProvider uses OS dir and files as a backend.
+type LocalProvider struct {
+	StorePath string `json:"storePath"`
 }

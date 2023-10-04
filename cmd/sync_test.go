@@ -28,8 +28,8 @@ import (
 func TestSync(t *testing.T) {
 	syncCmd := NewSyncCmd()
 	syncCmd.SetArgs([]string{
-		"--source", storeFile(t, "testdata"),
-		"--target", storeFile(t, filepath.Join(os.TempDir(), "target")),
+		"--source", localStore(t, "testdata"),
+		"--target", localStore(t, filepath.Join(os.TempDir(), "target")),
 		"--sync", "testdata/syncjob.yaml",
 		"--once",
 	})
@@ -37,7 +37,7 @@ func TestSync(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func storeFile(t *testing.T, dirPath string) string {
+func localStore(t *testing.T, dirPath string) string {
 	// Ensure dir exists
 	path, err := filepath.Abs(dirPath)
 	assert.Nil(t, err)
@@ -51,8 +51,8 @@ func storeFile(t *testing.T, dirPath string) string {
 
 	// Write
 	_, err = tmpFile.Write([]byte(fmt.Sprintf(`
-file:
-  dirPath: %q
+local:
+  storePath: %q
 `, path)))
 	assert.Nil(t, err)
 

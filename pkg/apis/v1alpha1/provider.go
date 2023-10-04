@@ -56,5 +56,5 @@ type StoreClient interface {
 type ProviderBackend struct {
 	Vault *VaultProvider `json:"vault,omitempty"`
 
-	File *FileProvider `json:"file,omitempty"`
+	Local *LocalProvider `json:"local,omitempty"`
 }

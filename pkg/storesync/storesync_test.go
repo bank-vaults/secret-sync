@@ -94,8 +94,8 @@ package storesync_test
 //	t.Cleanup(func() { _ = os.RemoveAll(path) })
 //
 //	client, err := provider.NewClient(context.Background(), &v1alpha1.ProviderBackend{
-//		File: &v1alpha1.FileProvider{
-//			DirPath: path,
+//		Local: &v1alpha1.FileProvider{
+//			StorePath: path,
 //		},
 //	})
 //	assert.Nil(t, err)

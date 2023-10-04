@@ -16,6 +16,7 @@ package vault
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
@@ -59,7 +60,14 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, e
 	if !ok {
 		return nil, fmt.Errorf("could not find %s for in get response", keyName)
 	}
-	return []byte(keyData.(string)), nil
+	strValue := keyData.(string)
+
+	// Try base64 decode, if not successful, skip
+	base64Decoded, err := base64.StdEncoding.DecodeString(strValue)
+	if err == nil {
+		return base64Decoded, nil
+	}
+	return []byte(strValue), nil
 }
 
 func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) ([]v1alpha1.SecretRef, error) {
@@ -133,7 +141,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []by
 // Not used since it has high memory footprint and does not handle search.
 // It could (potentially) be useful.
 // DEPRECATED
-//nolint
+// nolint
 func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) {
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))

@@ -69,7 +69,7 @@ func Sync(ctx context.Context,
 				// Fetch keys to store
 				plans, err := processor.GetSyncPlan(fetchCtx, id, req)
 				if err != nil {
-					logrus.WithField("z-req", req).Warnf("Failed to fetch reqID = %d sync plan, reason: %v", id, err)
+					logrus.WithField("z-req", req).Warnf("Failed to fetch plan item = %d sync plan, reason: %v", id, err)
 					return nil
 				}
 
@@ -114,16 +114,16 @@ func Sync(ctx context.Context,
 			if err != nil {
 				if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
 					logrus.WithField("z-req", plan.Request).
-						Warnf("Skipped syncing reqID = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
+						Warnf("Skipped syncing plan item = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
 				} else { // otherwise, log error
 					logrus.WithField("z-req", plan.Request).
-						Errorf("Failed to sync reqID = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
+						Errorf("Failed to sync plan item = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
 				}
 				return
 			}
 
 			logrus.WithField("z-req", plan.Request).
-				Infof("Successfully synced reqID = %d for key %s", plan.RequestID, ref.Key /* , string(plan.Data) */)
+				Infof("Successfully synced plan item = %d for key %s", plan.RequestID, ref.Key /* , string(plan.Data) */)
 			syncCounter.Add(1)
 		}(ref, plan)
 	}

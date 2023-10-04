@@ -1,2 +1,2 @@
-file:
-  dirPath: "/tmp/source"
+local:
+  storePath: "/tmp/source"
