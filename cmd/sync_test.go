@@ -51,8 +51,9 @@ func localStore(t *testing.T, dirPath string) string {
 
 	// Write
 	_, err = tmpFile.Write([]byte(fmt.Sprintf(`
-local:
-  storePath: %q
+secretsStore:
+  local:
+    storePath: %q
 `, path)))
 	assert.Nil(t, err)
 

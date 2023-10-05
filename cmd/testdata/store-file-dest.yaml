@@ -1,2 +1,3 @@
-local:
-  storePath: "/tmp/target"
+secretsStore:
+  local:
+    storePath: "/tmp/target"

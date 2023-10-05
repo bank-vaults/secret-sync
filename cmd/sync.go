@@ -56,9 +56,7 @@ func NewSyncCmd() *cobra.Command {
 	_ = cobraCmd.MarkFlagRequired("sync")
 
 	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", v1alpha1.DefaultSyncJobSchedule,
-		"Sync on CRON schedule. Either --schedule or --once should be specified.")
-	cobraCmd.Flags().BoolVar(&cmd.flagOnce, "once", false,
-		"Synchronize once and exit. Either --schedule or --once should be specified.")
+		"Sync periodically using CRON schedule. If not specified, runs only once.")
 
 	return cobraCmd
 }
@@ -68,7 +66,6 @@ type syncCmd struct {
 	flagDstFile  string
 	flagSyncFile string
 	flagSchedule string
-	flagOnce     bool
 
 	source v1alpha1.StoreReader
 	target v1alpha1.StoreWriter
@@ -99,16 +96,14 @@ func (cmd *syncCmd) init() error {
 	}
 
 	// Init sync request by loading from file and overriding from cli
-	cmd.sync, err = loadStrategy(cmd.flagSyncFile)
+	cmd.sync, err = loadSyncPlan(cmd.flagSyncFile)
 	if err != nil {
 		return err
-	}
-	if cmd.flagOnce {
-		cmd.sync.RunOnce = cmd.flagOnce
 	}
 	if cmd.flagSchedule != "" {
 		cmd.sync.Schedule = cmd.flagSchedule
 	}
+	cmd.sync.RunOnce = cmd.sync.RunOnce || cmd.sync.Schedule != ""
 
 	return nil
 }
@@ -148,7 +143,7 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	}
 }
 
-func loadStrategy(path string) (*v1alpha1.SyncJob, error) {
+func loadSyncPlan(path string) (*v1alpha1.SyncJob, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -175,13 +170,15 @@ func loadStore(path string) (*v1alpha1.ProviderBackend, error) {
 	}
 
 	// Unmarshal (convert YAML to JSON)
-	var spec v1alpha1.ProviderBackend
+	var storeConfig = struct {
+		SecretsStore v1alpha1.ProviderBackend `json:"secretsStore"`
+	}{}
 	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(jsonBytes, &spec); err != nil {
+	if err := json.Unmarshal(jsonBytes, &storeConfig); err != nil {
 		return nil, err
 	}
-	return &spec, nil
+	return &storeConfig.SecretsStore, nil
 }
