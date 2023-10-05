@@ -129,8 +129,8 @@ sync:
       path: /
       key:
         regexp: secret-.*
-      target:
-        keyPrefix: synced-
+    target:
+      keyPrefix: synced-
 EOF
 ```
 
@@ -143,9 +143,9 @@ Use `secret-sync` to execute sync plan between source and target secret stores.
 
 Wh should output something like:
 ```bash
-{"level":"info","msg":"Successfully synced plan item = 0 for key /secret-1"}
-{"level":"info","msg":"Successfully synced plan item = 0 for key /secret-2"}
-{"level":"info","msg":"Successfully synced plan item = 0 for key /secret-3"}
+{"level":"info","msg":"Successfully synced plan item = 0 for key /synced-secret-1"}
+{"level":"info","msg":"Successfully synced plan item = 0 for key /synced-secret-2"}
+{"level":"info","msg":"Successfully synced plan item = 0 for key /synced-secret-3"}
 {"level":"info","msg":"Synced 3 out of total 3 keys"
 ```
 To validate, navigate to the target secret store on the local Vault instance at [localhost:8200/ui/vault/secrets/secret/list](http://localhost:8200/ui/vault/secrets/secret/list) and login with `root` as token.

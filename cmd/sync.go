@@ -55,7 +55,7 @@ func NewSyncCmd() *cobra.Command {
 		"This is the strategy sync template.")
 	_ = cobraCmd.MarkFlagRequired("sync")
 
-	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", v1alpha1.DefaultSyncJobSchedule,
+	cobraCmd.Flags().StringVar(&cmd.flagSchedule, "schedule", "",
 		"Sync periodically using CRON schedule. If not specified, runs only once.")
 
 	return cobraCmd
@@ -103,7 +103,7 @@ func (cmd *syncCmd) init() error {
 	if cmd.flagSchedule != "" {
 		cmd.sync.Schedule = cmd.flagSchedule
 	}
-	cmd.sync.RunOnce = cmd.sync.RunOnce || cmd.sync.Schedule != ""
+	cmd.sync.RunOnce = cmd.sync.RunOnce || cmd.sync.Schedule == ""
 
 	return nil
 }
