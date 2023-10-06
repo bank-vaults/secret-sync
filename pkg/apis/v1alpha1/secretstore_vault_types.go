@@ -14,7 +14,12 @@
 
 package v1alpha1
 
-// LocalProvider uses OS dir and files as a backend.
-type LocalProvider struct {
+// VaultStore uses Hashicorp Vault as a backend.
+type VaultStore struct {
+	Address   string `json:"address"`
 	StorePath string `json:"storePath"`
+	Role      string `json:"role"`
+	AuthPath  string `json:"authPath"`
+	TokenPath string `json:"tokenPath"`
+	Token     string `json:"token"`
 }

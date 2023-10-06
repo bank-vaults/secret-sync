@@ -20,46 +20,46 @@ import (
 	"sync"
 )
 
-var providers = map[string]Provider{}
-var providerMu = sync.RWMutex{}
+var stores = map[string]SecretStore{}
+var storeMu = sync.RWMutex{}
 
-// Register a Provider for a given backend. Panics if a given backend is already registered.
-func Register(provider Provider, backend *ProviderBackend) {
-	providerName, err := getProviderName(backend)
+// Register a SecretStore for a given backend. Panics if a given backend is already registered.
+func Register(store SecretStore, backend *SecretStoreSpec) {
+	storeName, err := getSecretStoreName(backend)
 	if err != nil {
 		panic(fmt.Errorf("error registering secret backend: %w", err))
 	}
 
-	providerMu.Lock()
-	defer providerMu.Unlock()
-	if _, exists := providers[providerName]; exists {
-		panic(fmt.Errorf("store backend %s already registered", providerName))
+	storeMu.Lock()
+	defer storeMu.Unlock()
+	if _, exists := stores[storeName]; exists {
+		panic(fmt.Errorf("store backend %s already registered", storeName))
 	}
 
-	providers[providerName] = provider
+	stores[storeName] = store
 }
 
-// GetProvider returns the Provider for given ProviderBackend.
-func GetProvider(backend *ProviderBackend) (Provider, error) {
-	providerName, err := getProviderName(backend)
+// GetSecretStore returns the SecretStore for given SecretStoreSpec.
+func GetSecretStore(backend *SecretStoreSpec) (SecretStore, error) {
+	storeName, err := getSecretStoreName(backend)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find store backend: %w", err)
 	}
 
-	providerMu.RLock()
-	provider, ok := providers[providerName]
-	providerMu.RUnlock()
+	storeMu.RLock()
+	store, ok := stores[storeName]
+	storeMu.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("failed to find registered store backend for %s", providerName)
+		return nil, fmt.Errorf("failed to find registered store backend for %s", storeName)
 	}
 
-	return provider, nil
+	return store, nil
 }
 
-// getProviderName returns the name of the configured ProviderBackend or an error if the
-// Provider is invalid/not configured.
-func getProviderName(backend *ProviderBackend) (string, error) {
+// getSecretStoreName returns the name of the configured SecretStoreSpec or an error if the
+// SecretStore is invalid/not configured.
+func getSecretStoreName(backend *SecretStoreSpec) (string, error) {
 	if backend == nil {
 		return "", fmt.Errorf("no StoreConfig provided")
 	}

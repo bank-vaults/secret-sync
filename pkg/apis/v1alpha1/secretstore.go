@@ -21,13 +21,13 @@ import (
 
 var ErrKeyNotFound = errors.New("secret key not found")
 
-// Provider defines methods to manage store clients.
-type Provider interface {
+// SecretStore defines methods to manage interaction with secret store.
+type SecretStore interface {
 	// NewClient creates a new secret StoreClient for provided backend.
-	NewClient(ctx context.Context, backend ProviderBackend) (StoreClient, error)
+	NewClient(ctx context.Context, backend SecretStoreSpec) (StoreClient, error)
 
 	// Validate checks if the provided backend is valid.
-	Validate(backend ProviderBackend) error
+	Validate(backend SecretStoreSpec) error
 }
 
 // StoreReader implements read ops for a secret backend. Must support concurrent calls.
@@ -51,10 +51,10 @@ type StoreClient interface {
 	StoreWriter
 }
 
-// ProviderBackend defines the which backend should be used for Provider.
+// SecretStoreSpec defines the which backend should be used for SecretStore.
 // Only one can be specified.
-type ProviderBackend struct {
-	Vault *VaultProvider `json:"vault,omitempty"`
+type SecretStoreSpec struct {
+	Vault *VaultStore `json:"vault,omitempty"`
 
-	Local *LocalProvider `json:"local,omitempty"`
+	Local *LocalStore `json:"local,omitempty"`
 }

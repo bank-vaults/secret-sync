@@ -16,7 +16,6 @@ package vault
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
@@ -62,11 +61,6 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, e
 	}
 	strValue := keyData.(string)
 
-	// Try base64 decode, if not successful, skip
-	base64Decoded, err := base64.StdEncoding.DecodeString(strValue)
-	if err == nil {
-		return base64Decoded, nil
-	}
 	return []byte(strValue), nil
 }
 
@@ -100,18 +94,16 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 	// Extract keys from response
 	var result []v1alpha1.SecretRef
 	for _, listKey := range listSlice {
-		// Extract key from path
-		key := fmt.Sprintf("%s%v", queryPath, listKey)
-
 		// Skip values in KV store that are not keys (marked by a suffix '/').
-		if strings.HasSuffix(key, "/") {
+		keyName := fmt.Sprintf("%v", listKey)
+		if strings.HasSuffix(keyName, "/") {
 			continue
 		}
 
 		// Add key if it matches regexp query
-		if matches, _ := regexp.MatchString(query.Key.Regexp, key); matches {
+		if matches, _ := regexp.MatchString(query.Key.Regexp, keyName); matches {
 			result = append(result, v1alpha1.SecretRef{
-				Key: key,
+				Key: fmt.Sprintf("%s%s", queryPath, keyName),
 			})
 		}
 	}
@@ -141,7 +133,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []by
 // Not used since it has high memory footprint and does not handle search.
 // It could (potentially) be useful.
 // DEPRECATED
-// nolint
+//nolint
 func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) {
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))

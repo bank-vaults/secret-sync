@@ -25,22 +25,22 @@ import (
 )
 
 // NewClient creates a store client for provided store backend config.
-func NewClient(ctx context.Context, backend *v1alpha1.ProviderBackend) (v1alpha1.StoreClient, error) {
+func NewClient(ctx context.Context, backend *v1alpha1.SecretStoreSpec) (v1alpha1.StoreClient, error) {
 	// Get provider
-	provider, err := v1alpha1.GetProvider(backend)
+	provider, err := v1alpha1.GetSecretStore(backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get provider: %w", err)
+		return nil, fmt.Errorf("failed to get store: %w", err)
 	}
 
 	// Validate
 	if err = provider.Validate(*backend); err != nil {
-		return nil, fmt.Errorf("failed to validate store backend: %w", err)
+		return nil, fmt.Errorf("failed to validate store specs: %w", err)
 	}
 
 	// Create
 	client, err := provider.NewClient(ctx, *backend)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create store backend client: %w", err)
+		return nil, fmt.Errorf("failed to create store client: %w", err)
 	}
 
 	return client, nil

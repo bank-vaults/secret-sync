@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/bank-vaults/vault-sdk v0.9.0
 	github.com/ghodss/yaml v1.0.0
+	github.com/iancoleman/strcase v0.3.0
 	github.com/krayzpipes/cronticker v0.0.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3

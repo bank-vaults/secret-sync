@@ -23,13 +23,13 @@ import (
 
 type Provider struct{}
 
-func (p *Provider) NewClient(_ context.Context, backend v1alpha1.ProviderBackend) (v1alpha1.StoreClient, error) {
+func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreSpec) (v1alpha1.StoreClient, error) {
 	return &client{
 		dir: backend.Local.StorePath,
 	}, nil
 }
 
-func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
+func (p *Provider) Validate(backend v1alpha1.SecretStoreSpec) error {
 	if backend.Local == nil {
 		return fmt.Errorf("empty .Local")
 	}
@@ -40,7 +40,7 @@ func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
 }
 
 func init() {
-	v1alpha1.Register(&Provider{}, &v1alpha1.ProviderBackend{
-		Local: &v1alpha1.LocalProvider{},
+	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreSpec{
+		Local: &v1alpha1.LocalStore{},
 	})
 }

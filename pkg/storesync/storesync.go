@@ -42,7 +42,7 @@ type Status struct {
 func Sync(ctx context.Context,
 	source v1alpha1.StoreReader,
 	target v1alpha1.StoreWriter,
-	requests []v1alpha1.SyncRequest,
+	actions []v1alpha1.SyncAction,
 ) (*Status, error) {
 	// Validate
 	if source == nil {
@@ -51,41 +51,41 @@ func Sync(ctx context.Context,
 	if target == nil {
 		return nil, fmt.Errorf("target is nil")
 	}
-	if len(requests) == 0 {
+	if len(actions) == 0 {
 		return nil, fmt.Errorf("nothing to sync")
 	}
 
 	// Define data stores
 	syncMu := sync.Mutex{}
-	syncPlan := make(map[v1alpha1.SecretRef]SyncPlan)
+	syncRequests := make(map[v1alpha1.SecretRef]syncRequest)
 	processor := newProcessor(source)
 
 	// Get sync plan for each request in a separate goroutine.
 	// If the same secret needs to be synced more than once, abort sync.
 	fetchGroup, fetchCtx := errgroup.WithContext(ctx)
-	for id, req := range requests {
-		func(id int, req v1alpha1.SyncRequest) {
+	for id, action := range actions {
+		func(id int, action v1alpha1.SyncAction) {
 			fetchGroup.Go(func() error {
 				// Fetch keys to store
-				plans, err := processor.GetSyncPlan(fetchCtx, id, req)
+				requests, err := processor.GetSyncRequests(fetchCtx, id, action)
 				if err != nil {
-					logrus.WithField("z-req", req).Warnf("Failed to fetch plan item = %d sync plan, reason: %v", id, err)
+					logrus.WithField("z-req", requests).Warnf("Failed to fetch sync action = %d, reason: %v", id, err)
 					return nil
 				}
 
 				// Add to sync data
 				syncMu.Lock()
 				defer syncMu.Unlock()
-				for ref, plan := range plans {
-					if _, exists := syncPlan[ref]; exists {
+				for ref, request := range requests {
+					if _, exists := syncRequests[ref]; exists {
 						// This is a critical error; stop everything
 						return fmt.Errorf("key %v was schedule for sync more than once", ref)
 					}
-					syncPlan[ref] = plan
+					syncRequests[ref] = request
 				}
 				return nil
 			})
-		}(id, req)
+		}(id, action)
 	}
 
 	// Wait fetch
@@ -97,41 +97,41 @@ func Sync(ctx context.Context,
 	// Do sync for each plan item in a separate goroutine.
 	var syncWg sync.WaitGroup
 	var syncCounter atomic.Uint32
-	for ref, plan := range syncPlan {
+	for ref, req := range syncRequests {
 		syncWg.Add(1)
-		go func(ref v1alpha1.SecretRef, plan SyncPlan) {
+		go func(ref v1alpha1.SecretRef, req syncRequest) {
 			defer syncWg.Done()
 
 			// Sync
 			var err error
-			if len(plan.Data) == 0 {
+			if len(req.Data) == 0 {
 				err = fmt.Errorf("empty value")
 			} else {
-				err = target.SetSecret(ctx, ref, plan.Data)
+				err = target.SetSecret(ctx, ref, req.Data)
 			}
 
 			// Handle response
 			if err != nil {
 				if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-					logrus.WithField("z-req", plan.Request).
-						Warnf("Skipped syncing plan item = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
+					logrus.WithField("z-req", req.ActionRef).
+						Warnf("Skipped sync action = %d for key %s, reason: %v", req.RequestID, ref.Key, err)
 				} else { // otherwise, log error
-					logrus.WithField("z-req", plan.Request).
-						Errorf("Failed to sync plan item = %d for key %s, reason: %v", plan.RequestID, ref.Key, err)
+					logrus.WithField("z-req", req.ActionRef).
+						Errorf("Failed to sync action = %d for key %s, reason: %v", req.RequestID, ref.Key, err)
 				}
 				return
 			}
 
-			logrus.WithField("z-req", plan.Request).
-				Infof("Successfully synced plan item = %d for key %s", plan.RequestID, ref.Key /* , string(plan.Data) */)
+			logrus.WithField("z-req", req.ActionRef).
+				Infof("Successfully synced action = %d for key %s", req.RequestID, ref.Key /* , string(plan.Data) */)
 			syncCounter.Add(1)
-		}(ref, plan)
+		}(ref, req)
 	}
 	syncWg.Wait()
 
 	// Return response
 	syncCount := syncCounter.Load()
-	totalCount := uint32(len(syncPlan))
+	totalCount := uint32(len(syncRequests))
 	return &Status{
 		Total:    totalCount,
 		Synced:   syncCount,

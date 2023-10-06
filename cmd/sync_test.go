@@ -31,7 +31,6 @@ func TestSync(t *testing.T) {
 		"--source", localStore(t, "testdata"),
 		"--target", localStore(t, filepath.Join(os.TempDir(), "target")),
 		"--sync", "testdata/syncjob.yaml",
-		"--once",
 	})
 	err := syncCmd.Execute()
 	assert.Nil(t, err)

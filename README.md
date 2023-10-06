@@ -1,21 +1,228 @@
+<div style="text-align: center;" align="center">
+
 # Secret Sync
 
-Perform secret synchronization between secret stores (e.g. Hashicorp Vault to AWS Secret Manager) in a configurable and explicit manner.
-The goal of this project is to make usage and management of secrets as simple as possible for both developer and operation teams.
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
+[![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
 
-> [!WARNING]
-> This is an early alpha version and there will be changes made to the API. You can support us with your feedback.
+Perform secret synchronization between secret stores (e.g. Hashicorp Vault to AWS Secret Manager) in a configurable manner.
+Enable seamless interoperability between different secret stores and make use of explicit API to control when, what, and how to synchronize.
 
-### Supported secret stores
-The list of providers is rather small since the project is still in its early stage.
-Our goal is to gradually over time expand the list of supported providers,
-as well as consolidate APIs across and for providers.
+</div>
+
+### 🧩 Supported Stores
+
+| **Name**                          | **Status** |
+|-----------------------------------|------------|
+| [HashiCorps Vault](#secret-store) | _alpha_    |
+| [Local Directory](#secret-store)  | _alpha_    |
+
+> [!IMPORTANT]
+> This is an **early alpha version** and breaking changes are expected.
+> As such, it is not recommended for usage in production.
+> We are actively working on expanding the list of supported stores and consolidating our APIs.
+>
+> You can support us with your feedback, bug reports, and feature requests.
+
+## 🎯 Goal
+
+Secret Sync tries to tackle common issues related to secret usage and management lifecycle.
+Specifically, it aims to:
+* _Allow unified secret exchange between different stores_
+* _Define and perform synchronization steps clearly and explicitly_
+* _Enable safe and simple consumption of secrets_
+
+> Consider a situation where Dev teams need access to secrets from different environments.
+> Ops teams can provide access to secrets in the form of a sandboxed environment (e.g. new Vault instance) synced only with secrets Devs require; all in GitOps way.
+
+## 🚀 Getting Started
+
+To get familiarized, we will show how you can use Secret Sync to answer two questions:
+
+- How do I sync secrets from one store to another?
+- How do I consume secrets to bootstrap my configs?
+
+To answer the first question, we shall create some local secrets and synchronize them into Vault.<br>
+For the second question, we will use some secrets from Vault to create a config file for DB access.
+
+### 1. Prepare environment
+
+You will need the following tools to continue:
+- Docker
+- Git
+- Makefile
+- Golang `>= 1.21`
+
+To set up the environment, you can build from source:
+```bash
+git clone https://github.com/bank-vaults/secret-sync.git /tmp/secret-sync
+cd /tmp/secret-sync
+make build
+alias secret-sync="/tmp/secret-sync/build/secret-sync"
+```
+
+Alternatively, you can also use only Docker:
+```bash
+alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:latest secret-sync"
+```
+
+### 2. Define secret stores
+
+Documentation and examples on how to use different secret stores can be found in chapter [Secret Store](#secret-store).
+
+#### 2.1. Local store
+Create a directory and a config file to use as the _local secret store_.
+Secrets synced from other stores will be available in this directory.
+```bash
+# Create local store directory
+mkdir -p /tmp/example/local-store
+
+# Create local store config file
+cat <<EOF > /tmp/example/local-store.yml
+secretsStore:
+  local:
+    storePath: "/tmp/example/local-store"
+EOF
+```
+
+#### 2.2. Vault store
+Deploy Vault and create config file to use as the _Vault secret store_.
+Secrets synced from other stores will be available in this Vault instance.
+```bash
+# Deploy a Vault instance
+docker compose -f dev/vault/docker-compose.yml up -d
+
+# Create Vault store config file
+cat <<EOF > /tmp/example/vault-store.yml
+secretsStore:
+  vault:
+    address: "http://0.0.0.0:8200"
+    storePath: "secret/"
+    authPath: "userpass"
+    token: "root"
+EOF
+```
+
+### 3. Define sync plans
+Documentation and examples on how to create a more extensive sync plan can be found in chapter [Sync Plan](#sync-plan).
+
+#### 3.1. Database secrets
+Define a sync plan for `db-host`, `db-user`, `db-pass` secrets.
+These secrets will be synced from our local to Vault secret store.
+
+```bash
+cat <<EOF > /tmp/example/db-secrets-sync.yml
+sync:
+  - secretQuery:
+      path: /
+      key:
+        regexp: db-(host|user|pass)
+EOF
+```
+
+#### 3.1. Application access secret
+Define a sync plan for app-specific secret `app-access-config` created from various other secrets (e.g. database).
+This secret will be synced from Vault to our local secret store (as a file).
+It can also be synced between the same store to refresh the secret.
+
+```bash
+cat <<EOF > /tmp/example/app-access-config-sync.yml
+sync:
+  - secretSources:
+      - name: selector
+        secretQuery:
+          path: /
+          key:
+            regexp: db-(host|user|pass)
+    target:
+      key: app-access-config
+    template:
+      data:
+        appID: "12345"
+        # ...some additional secrets for the given app...
+
+        # Secrets fetched from Vault will be encoded, we need to decode
+        hostname: "{{ .Data.selector.dbHost | base64dec }}"
+        username: "{{ .Data.selector.dbUser | base64dec }}"
+        password: "{{ .Data.selector.dbPass | base64dec }}"
+EOF
+```
+
+### 4. Create database secrets
+
+Create database access secrets in our local secret store.
+```bash
+echo -n "very-secret-hostname" > /tmp/example/local-store/db-host
+echo -n "very-secret-username" > /tmp/example/local-store/db-user
+echo -n "very-secret-password" > /tmp/example/local-store/db-pass
+```
+
+### 5. Perform sync
+
+Secret synchronization is performed using the [CLI](#syncing-with-cli) by executing the sync plan between source and target secret stores.
+
+#### 5.1. Database secrets
+
+To synchronize database secrets from our local to Vault secret store, run:
+
+```bash
+secret-sync --source "/tmp/example/local-store.yml" --target "/tmp/example/vault-store.yml" --sync "/tmp/example/db-secrets-sync.yml"
+```
+
+If successful, your output should contain something like:
+
+```json
+{"level":"info","msg":"Successfully synced action = 0 for key /db-user"}
+{"level":"info","msg":"Successfully synced action = 0 for key /db-pass"}
+{"level":"info","msg":"Successfully synced action = 0 for key /db-host"}
+{"level":"info","msg":"Synced 3 out of total 3 keys"}
+```
+
+#### 5.2. Application access secret
+
+To synchronize application access secret from Vault to our local secret store, run:
+
+```bash
+secret-sync --target "/tmp/example/local-store.yml" --source "/tmp/example/vault-store.yml" --sync "/tmp/example/app-access-config-sync.yml"
+```
+
+If successful, you should be able to find the app access secret via:
+```bash
+cat /tmp/example/local-store/app-access-config
+# {"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
+```
+
+
+### 6. Cleanup
+
+```bash
+# Destroy Vault instance
+docker compose -f dev/vault/docker-compose.yml down
+
+# Remove example files
+rm -rf /tmp/example
+```
+
+## 📖 Documentation
+
+### Secret Store
+
+Secret store defines the actual secret store that will be used for API requests.
+In API requests, a secret store can be either a **source** where the secrets are fetched from or a **target** where
+the requested secrets are synced into.
+```yaml
+# Defines a specific store to use. Only one store can be specified.
+secretsStore:
+  # Each store has a unique name and associated specs.
+  storeName: storeSpec
+```
 
 <details>
-<summary><b>HashiCorp Vault*</b></summary>
+<summary>Store Spec: <b>HashiCorp Vault*</b></summary>
+
+#### Specs
 
 The following configuration selects [HashiCorp Vault](https://www.vaultproject.io/) as a secret store.
-Find example usage of this provider in Quick Start section.
 ```yaml
 secretsStore:
   vault:
@@ -27,15 +234,18 @@ secretsStore:
     token: "<Vault token>"
 ```
 _*Vault needs to be unsealed_.
+
 </details>
 
 <details>
-<summary><b>Local directory</b></summary>
+<summary>Store Spec: <b>Local directory</b></summary>
 
-Use this configuration to specify local directory as a secret store.
+#### Specs
+
+Use this configuration to specify a local directory as a secret store.
 Secrets are represented as unencrypted files within that directory,
 where filenames define secret keys and file contents the secret values.
-Find example usage of this provider in Quick Start section.
+This store is useful for local secret consumption.
 ```yaml
 secretsStore:
   local:
@@ -43,239 +253,297 @@ secretsStore:
 ```
 </details>
 
-## Goal
-
-The goal of _secret sync_ is to try to solve some common issues related to secret usage and management.
-More specifically:
-1. How to synchronize secrets from one service to another?
-2. How to explicitly define the synchronization rules for secrets?
-2. How to enable secret templating and bootstrapping capabilities?
-
-Consider a situation where Dev teams need access to secrets from a specific environment.
-To enable tenancy and GitOps, Ops teams can create sandboxed environments (e.g. new Vault instance) and synchronize
-into it only the secrets Dev teams can access or might require.
-In turn, Dev teams can easily access and use secrets in the same configurable manner.
-
----
-
-## Quick start
-
-In this example, we will show how you can synchronize specific secrets from a local directory to Vault instance and vice versa.
-
-#### Prepare environment
-Requirements:
-- Git
-- Docker
-- Golang 1.21
-
-Clone and build secret sync:
-```bash
-git clone https://github.com/bank-vaults/secret-sync.git
-cd secret-sync
-make build
-```
-
-#### Define secret stores
-Use local directory as the source secret store, ie. where the secrets will be synced from.
-```bash
-# Create dir to use for source secret store
-mkdir /tmp/source-store
-
-# Create source provider config file, use local dir
-cat <<EOF > /tmp/source-provider.yml
-secretsStore:
-  local:
-    storePath: "/tmp/source-store"
-EOF
-```
-
-Use Vault instance as the target secret store, ie. where the secrets will be synced to.
-```bash
-# Deploy a Vault instance for target secret store
-docker compose -f dev/vault/docker-compose.yml up -d
-
-# Create target provider config file, use Vault
-cat <<EOF > /tmp/target-provider.yml
-secretsStore:
-  vault:
-    address: "http://0.0.0.0:8200"
-    storePath: "secret/" # Vault store path
-    authPath: "userpass"
-    token: "root"
-EOF
-```
-
-### Create secrets to sync
-Create some secrets in the source store, ie. secrets to sync.
-```bash
-echo "VerySecretData1" > /tmp/source-store/secret-1
-echo "VerySecretData2" > /tmp/source-store/secret-2
-echo "VerySecretData3" > /tmp/source-store/secret-3
-```
-
-### Define sync plan
-Create a plan to define the sync steps between secret stores, ie. how to sync secrets.
-Examples on how to specify a more complex sync plan are documented in chapter [Sync Plan](#sync-plan).
-
-```bash
-cat <<EOF > /tmp/sync-plan.yml
-sync:
-  # We want to sync all secrets that starts with "secret-" from source store path "/"
-  # to the same path on target. Keys on target will be synced with "synced-" prefix.
-  # It is possible to specify multiple sync items, as well as to use templating,
-  # for a more complex sync plan.
-  # Sync items are indexed in logs based on their order in this config file.
-  - secretQuery:
-      path: /
-      key:
-        regexp: secret-.*
-    target:
-      keyPrefix: synced-
-EOF
-```
-
-### Sync secrets
-You are now ready to perform secret synchronization between secret stores.
-Use `secret-sync` to execute sync plan between source and target secret stores.
-```bash
-./build/secret-sync --source "/tmp/source-provider.yml" --target "/tmp/target-provider.yml" --sync "/tmp/sync-plan.yml"
-```
-
-Wh should output something like:
-```bash
-{"level":"info","msg":"Successfully synced plan item = 0 for key /synced-secret-1"}
-{"level":"info","msg":"Successfully synced plan item = 0 for key /synced-secret-2"}
-{"level":"info","msg":"Successfully synced plan item = 0 for key /synced-secret-3"}
-{"level":"info","msg":"Synced 3 out of total 3 keys"
-```
-To validate, navigate to the target secret store on the local Vault instance at [localhost:8200/ui/vault/secrets/secret/list](http://localhost:8200/ui/vault/secrets/secret/list) and login with `root` as token.
-You should now see `synced-secret-1`, `synced-secret-2`, and `synced-secret-3` keys.
-The values are base64 encoded.
-
-## Advanced usage
-
 ### Sync Plan
 
-<details>
-<summary>More advanced information on Sync Plan</summary>
+Sync plan consists of general configurations and a list of sync actions that enable the selection, transformation, and synchronization of secrets from source to target stores.
 
-#### Define stores
 ```yaml
-### Vault-A - Source
-### SecretStore: path/to/vault-source.yaml
-vault:
-    address: "http://0.0.0.0:8200"
-    storePath: "secret"
-    role: ""
-    authPath: "userpass"
-    tokenPath: ""
-    token: "root"
-```
-```yaml
-### Vault-B - Target
-### SecretStore: path/to/vault-target.yaml
-vault:
-    address: "http://0.0.0.0:8201"
-    storePath: "secret"
-    role: ""
-    authPath: "userpass"
-    tokenPath: ""
-    token: "root"
-```
+# Used to configure the schedule for synchronization. Optional, runs only once if empty.
+# The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
+schedule: "@daily"
 
-#### Define sync strategy
-```yaml
-### SyncJob: path/to/sync-job.yaml
-schedule: "@every 1h"
-## Defines how the secrets will be synced
+# Defines sync actions, i.e. how and what will be synced. Requires at least one.
 sync:
-  ## 1. Usage: Sync key from ref
-  - secretRef:
-      key: /source/credentials/username
-    target: # If not specified, will be synced under the same key
-      key: /target/example-1
-
-  ## 2. Usage: Sync all keys from query
-  - secretQuery:
-      path: /source/credentials
-      key:
-        regexp: .*
-    target: # If not specified, all keys will be synced under the same path
-      keyPrefix: /target/example-2/
-
-  ## 3. Usage: Sync key from ref with templating
-  - secretRef:
-      key: /source/credentials/password
-    target:
-      key: /target/example-3
-
-    # Template defines how the secret will be synced to target store.
-    # Either "rawData" or "data" should be specified, not both.
-    template:
-      rawData: '{{ .Data }}'   # Save as raw (accepts multiline string)
-      data:                    # Save as map (accepts nested values)
-        example: '{{ .Data }}'
-
-  ## 4. Usage: Sync all keys from query with templating
-  - secretQuery:
-      path: /source/credentials
-      key:
-        regexp: .*
-    target:
-      keyPrefix: /target/example-4/
-    template:
-      rawData: 'SECRET-PREFIX-{{ .Data }}'
-
-  ## 5. Usage: Sync single key from query with templating
-  - secretQuery:
-      path: /source/credentials/query-data/
-      key:
-        regexp: (username|password)
-    flatten: true
-    target:
-      key: /target/example-5
-
-    template:
-      data:
-        user: '{{ .Data.username }}'
-        pass: '{{ .Data.password }}'
-
-  ## 6. Usage: Sync single key from multiple sources with templating
-  - secretSources:
-      - name: username # Username mapping, available as ".Data.username"
-        secretRef:
-          key: /source/credentials/username
-
-      - name: password # Password mapping, available as ".Data.password"
-        secretRef:
-          key: /source/credentials/password
-
-      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
-        secretQuery:
-          path: /source/credentials
-          key:
-            regexp: .*
-
-    target:
-      key: /target/example-6
-
-    template:
-      data:
-        username: '{{ .Data.username }}'
-        password: '{{ .Data.password }}'
-        userpass: '{{ .Data.dynamic_query.username }}/{{ .Data.dynamic_query.password }}'
+  - actionSpec
+  - actionSpec
 ```
 
-#### Perform sync
-```bash
-secret-sync --source path/to/vault-source.yaml \
-            --target path/to/vault-target.yaml \
-            --sync path/to/sync-job.yaml
-# Use --schedule "@every 1m" to override sync job file config.
+Each sync action specifies one of four modes of operation depending on the specifications.
+You can use this as a reference point to create a more complete sync process based on the given requirements.
+
+<details>
+<summary>Action Spec: <b>Synchronize a secret from reference</b></summary>
+
+#### Specs
+
+```yaml
+sync:
+    # Specify which secret to fetch from source. Required.
+  - secretRef:
+      key: /path/in/source-store/key
+
+    # Specify where the secrets will be synced to on target. Optional.
+    # If empty, will be the same as "secretRef.key".
+    target:
+      key: /path/in/target-store/key
+
+    # Template defines how to transform secret before syncing to target. Optional.
+    # If set, either "template.rawData" or "template.data" must be specified.
+    #
+    # The template will be executed once to create a value to sync to "target.key".
+    # The value of the "secretRef.key" secret can be accessed via {{ .Data }}.
+    template:
+      rawData: '{{ .Data }}'  # save either as a (multiline) string
+      data:                   # or as a map
+        secretPassword: '{{ .Data }}'
+```
+
+#### Example
+
+Synchronize a single `/tenant-1/db-username` from the source store to `/remote-db-username` on the target store.
+```yaml
+sync:
+- secretRef:
+    key: /tenant-1/db-username
+  target:
+    key: /remote-db-username
 ```
 
 </details>
 
----
+<details>
+<summary>Action Spec: <b>Synchronize multiple secrets from a query</b></summary>
 
-Additional info here
+#### Specs
+
+```yaml
+sync:
+    # Specify query for secrets to fetch from source. Required.
+  - secretQuery:
+      path: /path/in/source-store
+      key:
+        regexp: some-key-prefix-.*
+
+    # Specify where the secrets will be synced to on target. Optional.
+    # > If set, every query matching secret will be synced under
+    #     key = "{target.keyPrefix}{match.GetName()}"
+    # > If empty, every query matching secret will be synced under
+    #     key = "{secretQuery.path}/{match.GetName()}".
+    target:
+      keyPrefix: /path/in/target-store/
+
+    # Template defines how to transform secret before syncing to target. Optional.
+    # If set, either "template.rawData" or "template.data" must be specified.
+    #
+    # This template will be executed for every query matching secret to create a secret
+    # which will be synced to "target".
+    # The value of (current) query secret can be accessed via {{ .Data }}.
+    template:
+      rawData: '{{ .Data }}'  # save either as a (multiline) string
+      data:                   # or as a map
+        secretPassword: '{{ .Data }}'
+```
+
+#### Example
+
+Synchronize all secrets that match `/tenant-1/db-*` regex from the source store to `/remote-<key>` on the target store.
+```yaml
+sync:
+- secretQuery:
+    path: /tenant-1
+    key:
+      regexp: db-.*
+  target:
+    keyPrefix: /remote-
+```
+
+</details>
+
+<details>
+<summary>Action Spec: <b>Synchronize a secret from a query</b></summary>
+
+#### Specs
+
+```yaml
+sync:
+    # Specify query for secrets to fetch from source. Required.
+  - secretQuery:
+      path: /path/in/source-store
+      key:
+        regexp: some-key-prefix-.*
+
+    # Indicate that you explicitly want to sync into a single key. Required.
+    flatten: true
+
+    # Specify where the secret will be synced to on target. Required.
+    target:
+      key: /path/in/target-store/key
+
+    # Template defines how to transform secret before syncing to target. Optional.
+    # If set, either "template.rawData" or "template.data" must be specified.
+    #
+    # The template will be executed once to create a value which will be synced to "target.key".
+    # The value for each secret from the "secretQuery" is accessible in the template
+    # via {{ .Data.<camelCasedQueryName> }}, for example {{ .Data.someKeyPrefix1 }}.
+    template:
+      rawData: '{{ .Data.someKeyPrefix1 }}' # save either as a (multiline) string
+      data:                                 # or as a map
+        secret: '{{ .Data.someKeyPrefix1 }}'
+```
+
+#### Example
+
+Fetch secrets that match `/tenant-1/db-(username|password)` regex from source store and use them
+to create a new (combined) db access secret on the target store.
+
+```yaml
+sync:
+- secretQuery:
+    path: /tenant-1
+    key:
+      regexp: db-(username|password)
+  flatten: true
+  target:
+    key: /db/access
+  template:
+    data:
+      type: "postgres"
+      username: "{{ .Data.dbUsername }}"
+      password: "{{ .Data.dbPassword }}"
+```
+
+</details>
+
+
+<details>
+<summary>Action Spec: <b>Synchronize a secret from multiple queries and references</b></summary>
+
+#### Specs
+
+```yaml
+sync:
+    # Specify (named) queries and references for secrets to fetch from source.
+    # At least one sync action is required.
+  - secretSources:
+    - name: action-ref
+      secretRef:
+        key: /path/in/source-store/key
+    - name: action-query
+      secretQuery:
+        path: /path/in/source-store
+        key:
+          regexp: some-key-prefix-.*
+
+    # Specify where the secret will be synced to on target. Required.
+    target:
+      key: /path/in/target-store/key
+
+    # Template defines how to transform secret before syncing to target. Optional.
+    # If set, either "template.rawData" or "template.data" must be specified.
+    #
+    # The template will be executed once to create a value which will be synced to "target.key".
+    # The value for each secret from the "secretSources" is accessible in the template via:
+    # > Use {{ .Data.<camelCaseSourceName> }} for "action-ref" source.
+    #   For example, use {{ .Data.actionRef }}
+    # > Use {{ .Data.<camelCaseSourceName>.<camelCasedQueryName> }} for "action-query" source.
+    #   For example {{ .Data.actionQuery }}
+    template:
+      rawData: '{{ .Data.actionRef }}'
+      data:
+        secret1: '{{ .Data.actionRef }}'
+        secret2: '{{ .Data.actionQuery.someKeyPrefix1 }}'
+```
+
+#### Example
+
+Fetch secrets that match `/db-(1|2)/(username|password)` regex from source store and use them
+to create a new (combined) db access secret on the target store.
+
+```yaml
+sync:
+  - secretSources:
+      - name: db1
+        secretRef:
+          path: /db-1
+          key:
+            regexp: username|password
+      - name: db2
+        secretRef:
+          path: /db-2
+          key:
+            regexp: username|password
+    target:
+      key: /dbs-combined
+    template:
+      data:
+        db1_username: "{{ .Data.db1.username }}"
+        db1_password: "{{ .Data.db1.password }}"
+        db2_username: "{{ .Data.db2.username }}"
+        db2_password: "{{ .Data.db2.password }}"
+```
+
+</details>
+
+#### On Templating
+
+The templating is supported for sync action items.
+In addition, it supports additional functions such as `base64dec` and `base64enc` for decoding/encoding, as well as
+`contains`, `hasPrefix`, `hasSuffix` for string manipulation.
+
+### CLI
+
+The CLI tool provides a way to run secret synchronization between secret stores.
+It requires three things:
+- Path to _source store_ config file via `--source` flag
+- Path to _target store_ config file via `--target` flag
+- Path to _sync plan_ config file via `--plan` flag
+
+Note that only YAML configuration files are supported.
+You can also provide optional params for CRON schedule to periodically sync secrets via `--schedule` flag.
+All sync actions are indexed in logs based on their order in the sync plan config file.
+
+## ⭐ Development
+
+**For an optimal developer experience, it is recommended to install [Nix](https://nixos.org/download.html) and [direnv](https://direnv.net/docs/installation.html).**
+
+_Alternatively, install [Go](https://go.dev/dl/) on your computer then run `make deps` to install the rest of the dependencies._
+
+Fetch required tools:
+```shell
+make deps
+```
+
+Build the CLI:
+
+```shell
+make build
+```
+
+Run the test suite:
+
+```shell
+make test
+```
+
+Run linters:
+
+```shell
+make lint # pass -j option to run them in parallel
+```
+
+Some linter violations can automatically be fixed:
+
+```shell
+make fmt
+```
+
+## 📖 Getting help
+
+- For feature requests and bugs, file an [issue](https://github.com/bank-vaults/secret-sync/issues).
+- For general discussion about both usage and development:
+  - join the [#secret-sync](https://outshift.slack.com/messages/secret-sync) on the Outshift Slack
+  - open a new [discussion](https://github.com/bank-vaults/secret-sync/discussions)
+
+## ©️ License
+
+The project is licensed under the [Apache 2.0 License](https://github.com/bank-vaults/secret-sync/blob/master/LICENSE).

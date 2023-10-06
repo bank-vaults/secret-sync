@@ -103,14 +103,13 @@ func (cmd *syncCmd) init() error {
 	if cmd.flagSchedule != "" {
 		cmd.sync.Schedule = cmd.flagSchedule
 	}
-	cmd.sync.RunOnce = cmd.sync.RunOnce || cmd.sync.Schedule == ""
 
 	return nil
 }
 
 func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	// Run once
-	if syncReq.RunOnce {
+	if syncReq.GetSchedule() == nil {
 		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.target, syncReq.Sync)
 		if err != nil {
 			return err
@@ -162,7 +161,7 @@ func loadSyncPlan(path string) (*v1alpha1.SyncJob, error) {
 	return &ruleCfg, nil
 }
 
-func loadStore(path string) (*v1alpha1.ProviderBackend, error) {
+func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
 	// Load file
 	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -171,7 +170,7 @@ func loadStore(path string) (*v1alpha1.ProviderBackend, error) {
 
 	// Unmarshal (convert YAML to JSON)
 	var storeConfig = struct {
-		SecretsStore v1alpha1.ProviderBackend `json:"secretsStore"`
+		SecretsStore v1alpha1.SecretStoreSpec `json:"secretsStore"`
 	}{}
 	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 	if err != nil {

@@ -25,7 +25,7 @@ import (
 
 type Provider struct{}
 
-func (p *Provider) NewClient(_ context.Context, backend v1alpha1.ProviderBackend) (v1alpha1.StoreClient, error) {
+func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreSpec) (v1alpha1.StoreClient, error) {
 	vaultCfg := backend.Vault
 	apiClient, err := vault.NewClientWithOptions(
 		vault.ClientURL(vaultCfg.Address),
@@ -43,7 +43,7 @@ func (p *Provider) NewClient(_ context.Context, backend v1alpha1.ProviderBackend
 	}, nil
 }
 
-func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
+func (p *Provider) Validate(backend v1alpha1.SecretStoreSpec) error {
 	vaultCfg := backend.Vault
 	if vaultCfg == nil {
 		return fmt.Errorf("empty Vault config")
@@ -64,7 +64,7 @@ func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
 }
 
 func init() {
-	v1alpha1.Register(&Provider{}, &v1alpha1.ProviderBackend{
-		Vault: &v1alpha1.VaultProvider{},
+	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreSpec{
+		Vault: &v1alpha1.VaultStore{},
 	})
 }
