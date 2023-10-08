@@ -59,7 +59,9 @@ func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, e
 	if !ok {
 		return nil, fmt.Errorf("could not find %s for in get response", keyName)
 	}
-	return []byte(keyData.(string)), nil
+	strValue := keyData.(string)
+
+	return []byte(strValue), nil
 }
 
 func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) ([]v1alpha1.SecretRef, error) {
@@ -92,18 +94,16 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 	// Extract keys from response
 	var result []v1alpha1.SecretRef
 	for _, listKey := range listSlice {
-		// Extract key from path
-		key := fmt.Sprintf("%s%v", queryPath, listKey)
-
 		// Skip values in KV store that are not keys (marked by a suffix '/').
-		if strings.HasSuffix(key, "/") {
+		keyName := fmt.Sprintf("%v", listKey)
+		if strings.HasSuffix(keyName, "/") {
 			continue
 		}
 
 		// Add key if it matches regexp query
-		if matches, _ := regexp.MatchString(query.Key.Regexp, key); matches {
+		if matches, _ := regexp.MatchString(query.Key.Regexp, keyName); matches {
 			result = append(result, v1alpha1.SecretRef{
-				Key: key,
+				Key: fmt.Sprintf("%s%s", queryPath, keyName),
 			})
 		}
 	}

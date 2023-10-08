@@ -1,15 +1,3 @@
-## Used to configure schedule for synchronization.
-## The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
-schedule: "@daily"
-
-## Used to only perform sync once.
-## If specified, Schedule will be ignored.
-runOnce: false
-
-## Points to a file where all sync logs should be saved to.
-auditLogPath: "path/to/file"
-
-## Defines how the secrets will be synced
 sync:
   ## 1. Usage: Sync key from ref
   - secretRef:
@@ -71,7 +59,7 @@ sync:
         secretRef:
           key: /source/credentials/password
 
-      - name: dynamic_query # Query mapping, available as "Data.dynamic_query.<key>"
+      - name: dynamic-query # Query mapping, available as "Data.dynamic_query.<key>"
         secretQuery:
           path: /source/credentials
           key:
@@ -84,7 +72,7 @@ sync:
       data:
         username: '{{ .Data.username }}'
         password: '{{ .Data.password }}'
-        userpass: '{{ .Data.dynamic_query.username }}/{{ .Data.dynamic_query.password }}'
+        userpass: '{{ .Data.dynamicQuery.username }}/{{ .Data.dynamicQuery.password }}'
 
 
 ## TODO: Move these items to tests

@@ -22,10 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	DefaultSyncJobSchedule     = "@hourly"
-	DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
-)
+var DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
 
 // SyncJob defines overall source-to-target sync strategy.
 // TODO: Add support for auditing.
@@ -41,26 +38,21 @@ type SyncJob struct {
 	// Optional
 	Schedule string `json:"schedule,omitempty"`
 
-	// Used to only perform sync once.
-	// If specified, Schedule will be ignored.
-	// Optional
-	RunOnce bool `json:"runOnce,omitempty"`
-
 	// Used to specify the strategy for secrets sync.
 	// Required
-	Sync []SyncRequest `json:"sync,omitempty"`
+	Sync []SyncAction `json:"sync,omitempty"`
 }
 
-func (spec *SyncJob) GetSchedule() string {
+func (spec *SyncJob) GetSchedule() *string {
 	if spec.Schedule == "" {
-		return DefaultSyncJobSchedule
+		return nil
 	}
 	if _, err := cron.Parse(spec.Schedule); err != nil {
-		logrus.Errorf("using default Schedule %s due to parse error: %v", DefaultSyncJobSchedule, err)
-		return DefaultSyncJobSchedule
+		logrus.Errorf("skipping Schedule due to parse error: %v", err)
+		return nil
 	}
 
-	return spec.Schedule
+	return &spec.Schedule
 }
 
 func (spec *SyncJob) GetAuditLogPath() string {
@@ -70,9 +62,9 @@ func (spec *SyncJob) GetAuditLogPath() string {
 	return spec.AuditLogPath
 }
 
-// SyncRequest defines how to fetch, transform, and sync SecretRef(s) from source to target.
+// SyncAction defines how to fetch, transform, and sync SecretRef(s) from source to target.
 // Only one of FromRef, FromQuery, FromSources can be specified.
-type SyncRequest struct {
+type SyncAction struct {
 	// FromRef selects a secret from a reference.
 	// If SyncTarget.Key is nil, it will sync under referenced key.
 	// If SyncTarget.Key is not-nil, it will sync under targeted key.

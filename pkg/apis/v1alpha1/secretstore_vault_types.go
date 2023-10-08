@@ -14,8 +14,8 @@
 
 package v1alpha1
 
-// VaultProvider uses Hashicorp Vault as a backend.
-type VaultProvider struct {
+// VaultStore uses Hashicorp Vault as a backend.
+type VaultStore struct {
 	Address   string `json:"address"`
 	StorePath string `json:"storePath"`
 	Role      string `json:"role"`

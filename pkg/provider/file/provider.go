@@ -23,24 +23,24 @@ import (
 
 type Provider struct{}
 
-func (p *Provider) NewClient(_ context.Context, backend v1alpha1.ProviderBackend) (v1alpha1.StoreClient, error) {
+func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreSpec) (v1alpha1.StoreClient, error) {
 	return &client{
-		dir: backend.File.DirPath,
+		dir: backend.Local.StorePath,
 	}, nil
 }
 
-func (p *Provider) Validate(backend v1alpha1.ProviderBackend) error {
-	if backend.File == nil {
-		return fmt.Errorf("empty .File")
+func (p *Provider) Validate(backend v1alpha1.SecretStoreSpec) error {
+	if backend.Local == nil {
+		return fmt.Errorf("empty .Local")
 	}
-	if backend.File.DirPath == "" {
-		return fmt.Errorf("empty .File.DirPath")
+	if backend.Local.StorePath == "" {
+		return fmt.Errorf("empty .Local.StorePath")
 	}
 	return nil
 }
 
 func init() {
-	v1alpha1.Register(&Provider{}, &v1alpha1.ProviderBackend{
-		File: &v1alpha1.FileProvider{},
+	v1alpha1.Register(&Provider{}, &v1alpha1.SecretStoreSpec{
+		Local: &v1alpha1.LocalStore{},
 	})
 }

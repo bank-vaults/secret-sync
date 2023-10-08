@@ -16,7 +16,7 @@ package v1alpha1
 
 import "strings"
 
-// SecretRef defines Provider reference key.
+// SecretRef defines SecretStore reference key.
 // TODO: Add support for version
 // TODO: Add support for map field selector
 // TODO: Add support for encoding
@@ -33,7 +33,7 @@ type SecretRef struct {
 
 // GetPath returns path pointed by Key, e.g. GetPath("/path/to/key") returns ["path", "to"]
 func (key *SecretRef) GetPath() []string {
-	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
+	parts := strings.Split(key.sanitizedKey(), "/")
 	if len(parts) == 0 {
 		return nil
 	}
@@ -42,14 +42,21 @@ func (key *SecretRef) GetPath() []string {
 
 // GetName returns (domain) name pointed by Key, e.g. GetName("/path/to/key") returns "key"
 func (key *SecretRef) GetName() string {
-	parts := strings.Split(strings.TrimPrefix(key.Key, "/"), "/")
+	parts := strings.Split(key.sanitizedKey(), "/")
 	if len(parts) == 0 {
 		return key.Key
 	}
 	return parts[len(parts)-1]
 }
 
-// SecretQuery defines how to query Provider to obtain SecretRef(s).
+func (key *SecretRef) sanitizedKey() string {
+	clean := key.Key
+	clean = strings.TrimPrefix(clean, "/")
+	clean = strings.TrimSuffix(clean, "/")
+	return clean
+}
+
+// SecretQuery defines how to query SecretStore to obtain SecretRef(s).
 // TODO: Add support for version
 // TODO: Add support for map field selector
 // TODO: Add support for encoding
@@ -65,8 +72,8 @@ type SecretQuery struct {
 
 // SecretSource defines named secret source.
 // This enables named usage in SyncTemplate given as:
-// a) when using FromRef, enables {{ .Data.ref_name }}
-// b) when using FromQuery, enables {{ .Data.query_name.<SECRET_KEY> }}
+// a) when using FromRef, enables {{ .Data.<refName> }}
+// b) when using FromQuery, enables {{ .Data.<refQuery>.<secretKey> }}
 type SecretSource struct {
 	// Used to define unique name for templating.
 	// Required

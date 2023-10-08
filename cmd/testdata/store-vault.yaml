@@ -1,7 +1,8 @@
-vault:
-  address: http://0.0.0.0:8200
-  storePath: secret
-  role: ''
-  authPath: userpass
-  tokenPath: ''
-  token: root
+secretsStore:
+  vault:
+    address: http://0.0.0.0:8200
+    storePath: secret
+    role: ''
+    authPath: userpass
+    tokenPath: ''
+    token: root

@@ -54,9 +54,10 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 			// Extract secret key from the relative OS system path
 			relativePath := strings.ReplaceAll(path, c.dir+string(os.PathSeparator), "")
 			key := strings.ReplaceAll(relativePath, string(os.PathSeparator), "/")
+			keyName := filepath.Base(path)
 
 			// Add key if it matches regexp query
-			if matches, _ := regexp.MatchString(query.Key.Regexp, key); matches {
+			if matches, _ := regexp.MatchString(query.Key.Regexp, keyName); matches {
 				result = append(result, v1alpha1.SecretRef{
 					Key: "/" + key,
 				})
