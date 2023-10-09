@@ -57,7 +57,7 @@ alias secret-sync="/tmp/secret-sync/build/secret-sync"
 
 Alternatively, you can also use only Docker:
 ```bash
-alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:latest secret-sync"
+alias secret-sync="docker run --net=host --user $(id -u):$(id -g) --rm -v /tmp/example:/tmp/example ghcr.io/bank-vaults/secret-sync:latest secret-sync"
 ```
 
 ### 2. Define secret stores
