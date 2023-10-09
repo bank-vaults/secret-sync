@@ -1,5 +1,3 @@
-<div style="text-align: center;" align="center">
-
 # Secret Sync
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
@@ -8,14 +6,10 @@
 Perform secret synchronization between secret stores (e.g. Hashicorp Vault to AWS Secret Manager) in a configurable manner.
 Enable seamless interoperability between different secret stores and make use of explicit API to control when, what, and how to synchronize.
 
-</div>
-
-### 🧩 Supported Stores
-
-| **Name**                          | **Status** |
-|-----------------------------------|------------|
-| [HashiCorps Vault](#secret-store) | _alpha_    |
-| [Local Directory](#secret-store)  | _alpha_    |
+| **Store**                          | **Status** |
+|------------------------------------|------------|
+| [HashiCorp's Vault](#secret-store) | _alpha_    |
+| [Local Directory](#secret-store)   | _alpha_    |
 
 > [!IMPORTANT]
 > This is an **early alpha version** and breaking changes are expected.
@@ -24,7 +18,7 @@ Enable seamless interoperability between different secret stores and make use of
 >
 > You can support us with your feedback, bug reports, and feature requests.
 
-## 🎯 Goal
+## Goal
 
 Secret Sync tries to tackle common issues related to secret usage and management lifecycle.
 Specifically, it aims to:
@@ -35,15 +29,15 @@ Specifically, it aims to:
 > Consider a situation where Dev teams need access to secrets from different environments.
 > Ops teams can provide access to secrets in the form of a sandboxed environment (e.g. new Vault instance) synced only with secrets Devs require; all in GitOps way.
 
-## 🚀 Getting Started
+## Getting Started
 
 To get familiarized, we will show how you can use Secret Sync to answer two questions:
 
 - How do I sync secrets from one store to another?
 - How do I consume secrets to bootstrap my configs?
 
-To answer the first question, we shall create some local secrets and synchronize them into Vault.<br>
-For the second question, we will use some secrets from Vault to create a config file for DB access.
+To answer the first question, we shall create some database secrets and synchronize them into Vault.<br>
+For the second question, we will use some secrets from Vault to create an access file for an application.
 
 ### 1. Prepare environment
 
@@ -72,7 +66,6 @@ Documentation and examples on how to use different secret stores can be found in
 
 #### 2.1. Local store
 Create a directory and a config file to use as the _local secret store_.
-Secrets synced from other stores will be available in this directory.
 ```bash
 # Create local store directory
 mkdir -p /tmp/example/local-store
@@ -87,7 +80,6 @@ EOF
 
 #### 2.2. Vault store
 Deploy Vault and create config file to use as the _Vault secret store_.
-Secrets synced from other stores will be available in this Vault instance.
 ```bash
 # Deploy a Vault instance
 docker compose -f dev/vault/docker-compose.yml up -d
@@ -123,7 +115,7 @@ EOF
 #### 3.1. Application access secret
 Define a sync plan for app-specific secret `app-access-config` created from various other secrets (e.g. database).
 This secret will be synced from Vault to our local secret store (as a file).
-It can also be synced between the same store to refresh the secret.
+It can also be synced against the same store to refresh the secret.
 
 ```bash
 cat <<EOF > /tmp/example/app-access-config-sync.yml
@@ -186,7 +178,7 @@ To synchronize application access secret from Vault to our local secret store, r
 secret-sync --target "/tmp/example/local-store.yml" --source "/tmp/example/vault-store.yml" --sync "/tmp/example/app-access-config-sync.yml"
 ```
 
-If successful, you should be able to find the app access secret via:
+If successful, beside logs, you should also be able to find the app access secret via:
 ```bash
 cat /tmp/example/local-store/app-access-config
 # {"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
@@ -203,7 +195,7 @@ docker compose -f dev/vault/docker-compose.yml down
 rm -rf /tmp/example
 ```
 
-## 📖 Documentation
+## Documentation
 
 ### Secret Store
 
@@ -218,11 +210,11 @@ secretsStore:
 ```
 
 <details>
-<summary>Store Spec: <b>HashiCorp Vault*</b></summary>
+<summary>Store Spec: <b>HashiCorp's Vault*</b></summary>
 
 #### Specs
 
-The following configuration selects [HashiCorp Vault](https://www.vaultproject.io/) as a secret store.
+The following configuration selects [HashiCorp's Vault](https://www.vaultproject.io/) as a secret store.
 ```yaml
 secretsStore:
   vault:
@@ -486,9 +478,9 @@ sync:
 
 #### On Templating
 
-The templating is supported for sync action items.
-In addition, it supports additional functions such as `base64dec` and `base64enc` for decoding/encoding, as well as
-`contains`, `hasPrefix`, `hasSuffix` for string manipulation.
+Standard golang templating is supported for sync action items.
+In addition, functions such as `base64dec` and `base64enc` for decoding/encoding and
+`contains`, `hasPrefix`, `hasSuffix` for string manipulation are also supported.
 
 ### CLI
 
@@ -502,7 +494,7 @@ Note that only YAML configuration files are supported.
 You can also provide optional params for CRON schedule to periodically sync secrets via `--schedule` flag.
 All sync actions are indexed in logs based on their order in the sync plan config file.
 
-## ⭐ Development
+## Development
 
 **For an optimal developer experience, it is recommended to install [Nix](https://nixos.org/download.html) and [direnv](https://direnv.net/docs/installation.html).**
 
@@ -537,13 +529,13 @@ Some linter violations can automatically be fixed:
 make fmt
 ```
 
-## 📖 Getting help
+## Getting help
 
 - For feature requests and bugs, file an [issue](https://github.com/bank-vaults/secret-sync/issues).
 - For general discussion about both usage and development:
   - join the [#secret-sync](https://outshift.slack.com/messages/secret-sync) on the Outshift Slack
   - open a new [discussion](https://github.com/bank-vaults/secret-sync/discussions)
 
-## ©️ License
+## License
 
 The project is licensed under the [Apache 2.0 License](https://github.com/bank-vaults/secret-sync/blob/master/LICENSE).
