@@ -2,6 +2,7 @@
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_shield)
 
 Perform secret synchronization between secret stores (e.g. Hashicorp Vault to AWS Secret Manager) in a configurable manner.
 Enable seamless interoperability between different secret stores and make use of explicit API to control when, what, and how to synchronize.
@@ -539,3 +540,6 @@ make fmt
 ## License
 
 The project is licensed under the [Apache 2.0 License](https://github.com/bank-vaults/secret-sync/blob/master/LICENSE).
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_large)
