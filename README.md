@@ -1,15 +1,16 @@
 # Secret Sync
 
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
+
+[![go.dev - references](https://img.shields.io/badge/go.dev-references-047897)](https://pkg.go.dev/github.com/bank-vaults/secret-sync)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_shield)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
 
-Perform secret synchronization between secret stores (e.g. Hashicorp Vault to AWS Secret Manager) in a configurable manner.
-Enable seamless interoperability between different secret stores and make use of explicit API to control when, what, and how to synchronize.
+Secret Sync exposes a generic way to interact with external secret storage systems like
+[HashiCorp Vault](https://www.vaultproject.io/), [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/), [Google Secrets Manager](https://cloud.google.com/secret-manager), [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/), and others.
+In addition, it also provides a set of API models and custom resources to explicitly manage the synchronization of secrets between these stores.
 
-| **Store**                          | **Status** |
-|------------------------------------|------------|
-| [HashiCorp's Vault](#secret-store) | _alpha_    |
-| [Local Directory](#secret-store)   | _alpha_    |
+This name was chosen in a rush, we are open to naming suggestions 😄
 
 > [!IMPORTANT]
 > This is an **early alpha version** and breaking changes are expected.
@@ -18,20 +19,33 @@ Enable seamless interoperability between different secret stores and make use of
 >
 > You can support us with your feedback, bug reports, and feature requests.
 
+## Features
+
+- Seamless integration with a variety of secret storage systems (stores)
+- User-friendly API for defining synchronization actions on a secret-level
+- Advanced templating capabilities for defining and transforming secrets
+- Facilitate interaction between stores using Golang packages or the CLI
+
+
+| **Supported store**                | **Status** |
+|------------------------------------|------------|
+| [HashiCorp's Vault](#secret-store) | _alpha_    |
+| [Local](#secret-store)             | _alpha_    |
+
+Check details about upcoming features by visiting the [project issue](https://github.com/bank-vaults/secret-sync/issues) board.
+
 ## Goal
 
-Secret Sync tries to tackle common issues related to secret usage and management lifecycle.
-Specifically, it aims to:
-* _Allow unified secret exchange between different stores_
-* _Define and perform synchronization steps clearly and explicitly_
-* _Enable safe and simple consumption of secrets_
+* Provide safe and simple way to consume secrets
+* Common API regardless of the secret store backend
+* Explicit control over the secret synchronization process
 
 > Consider a situation where Dev teams need access to secrets from different environments.
 > Ops teams can provide access to secrets in the form of a sandboxed environment (e.g. new Vault instance) synced only with secrets Devs require; all in GitOps way.
 
 ## Getting Started
 
-To get familiarized, we will show how you can use Secret Sync to answer two questions:
+To get familiarized, we will show how you can use these tools to answer two questions:
 
 - How do I sync secrets from one store to another?
 - How do I consume secrets to bootstrap my configs?
@@ -39,175 +53,24 @@ To get familiarized, we will show how you can use Secret Sync to answer two ques
 To answer the first question, we shall create some database secrets and synchronize them into Vault.<br>
 For the second question, we will use some secrets from Vault to create an access file for an application.
 
-### 1. Prepare environment
-
-You will need the following tools to continue:
-- Docker
-- Git
-- Makefile
-- Golang `>= 1.21`
-
-To set up the environment, you can build from source:
-```bash
-git clone https://github.com/bank-vaults/secret-sync.git /tmp/secret-sync
-cd /tmp/secret-sync
-make build
-alias secret-sync="/tmp/secret-sync/build/secret-sync"
-```
-
-Alternatively, you can also use only Docker:
-```bash
-alias secret-sync="docker run --net=host --user $(id -u):$(id -g) --rm -v /tmp/example:/tmp/example ghcr.io/bank-vaults/secret-sync:latest secret-sync"
-```
-
-### 2. Define secret stores
-
-Documentation and examples on how to use different secret stores can be found in chapter [Secret Store](#secret-store).
-
-#### 2.1. Local store
-Create a directory and a config file to use as the _local secret store_.
-```bash
-# Create local store directory
-mkdir -p /tmp/example/local-store
-
-# Create local store config file
-cat <<EOF > /tmp/example/local-store.yml
-secretsStore:
-  local:
-    storePath: "/tmp/example/local-store"
-EOF
-```
-
-#### 2.2. Vault store
-Deploy Vault and create config file to use as the _Vault secret store_.
-```bash
-# Deploy a Vault instance
-docker compose -f dev/vault/docker-compose.yml up -d
-
-# Create Vault store config file
-cat <<EOF > /tmp/example/vault-store.yml
-secretsStore:
-  vault:
-    address: "http://0.0.0.0:8200"
-    storePath: "secret/"
-    authPath: "userpass"
-    token: "root"
-EOF
-```
-
-### 3. Define sync plans
-Documentation and examples on how to create a more extensive sync plan can be found in chapter [Sync Plan](#sync-plan).
-
-#### 3.1. Database secrets
-Define a sync plan for `db-host`, `db-user`, `db-pass` secrets.
-These secrets will be synced from our local to Vault secret store.
-
-```bash
-cat <<EOF > /tmp/example/db-secrets-sync.yml
-sync:
-  - secretQuery:
-      path: /
-      key:
-        regexp: db-(host|user|pass)
-EOF
-```
-
-#### 3.1. Application access secret
-Define a sync plan for app-specific secret `app-access-config` created from various other secrets (e.g. database).
-This secret will be synced from Vault to our local secret store (as a file).
-It can also be synced against the same store to refresh the secret.
-
-```bash
-cat <<EOF > /tmp/example/app-access-config-sync.yml
-sync:
-  - secretSources:
-      - name: selector
-        secretQuery:
-          path: /
-          key:
-            regexp: db-(host|user|pass)
-    target:
-      key: app-access-config
-    template:
-      data:
-        appID: "12345"
-        # ...some additional secrets for the given app...
-
-        # Secrets fetched from Vault will be encoded, we need to decode
-        hostname: "{{ .Data.selector.dbHost | base64dec }}"
-        username: "{{ .Data.selector.dbUser | base64dec }}"
-        password: "{{ .Data.selector.dbPass | base64dec }}"
-EOF
-```
-
-### 4. Create database secrets
-
-Create database access secrets in our local secret store.
-```bash
-echo -n "very-secret-hostname" > /tmp/example/local-store/db-host
-echo -n "very-secret-username" > /tmp/example/local-store/db-user
-echo -n "very-secret-password" > /tmp/example/local-store/db-pass
-```
-
-### 5. Perform sync
-
-Secret synchronization is performed using the [CLI](#syncing-with-cli) by executing the sync plan between source and target secret stores.
-
-#### 5.1. Database secrets
-
-To synchronize database secrets from our local to Vault secret store, run:
-
-```bash
-secret-sync --source "/tmp/example/local-store.yml" --target "/tmp/example/vault-store.yml" --sync "/tmp/example/db-secrets-sync.yml"
-```
-
-If successful, your output should contain something like:
-
-```json
-{"level":"info","msg":"Successfully synced action = 0 for key /db-user"}
-{"level":"info","msg":"Successfully synced action = 0 for key /db-pass"}
-{"level":"info","msg":"Successfully synced action = 0 for key /db-host"}
-{"level":"info","msg":"Synced 3 out of total 3 keys"}
-```
-
-#### 5.2. Application access secret
-
-To synchronize application access secret from Vault to our local secret store, run:
-
-```bash
-secret-sync --target "/tmp/example/local-store.yml" --source "/tmp/example/vault-store.yml" --sync "/tmp/example/app-access-config-sync.yml"
-```
-
-If successful, beside logs, you should also be able to find the app access secret via:
-```bash
-cat /tmp/example/local-store/app-access-config
-# {"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
-```
-
-
-### 6. Cleanup
-
-```bash
-# Destroy Vault instance
-docker compose -f dev/vault/docker-compose.yml down
-
-# Remove example files
-rm -rf /tmp/example
-```
+You can find complete examples and instructions in the [EXAMPLE](EXAMPLE.md) file.
 
 ## Documentation
 
 ### Secret Store
 
 Secret store defines the actual secret store that will be used for API requests.
-In API requests, a secret store can be either a **source** where the secrets are fetched from or a **target** where
+In API requests, a secret store can be either a _source_ where the secrets are fetched from or a _target_ where
 the requested secrets are synced into.
+
 ```yaml
 # Defines a specific store to use. Only one store can be specified.
 secretsStore:
   # Each store has a unique name and associated specs.
   storeName: storeSpec
 ```
+
+You can find all the Secret Store specifications in [pkg/apis/v1alpha1/secretstore.go](pkg/apis/v1alpha1/secretstore.go)
 
 <details>
 <summary>Store Spec: <b>HashiCorp's Vault*</b></summary>
@@ -230,7 +93,7 @@ _*Vault needs to be unsealed_.
 </details>
 
 <details>
-<summary>Store Spec: <b>Local directory</b></summary>
+<summary>Store Spec: <b>Local</b></summary>
 
 #### Specs
 
@@ -248,6 +111,8 @@ secretsStore:
 ### Sync Plan
 
 Sync plan consists of general configurations and a list of sync actions that enable the selection, transformation, and synchronization of secrets from source to target stores.
+Each sync action defines a specific mode of operation depending on its specifications.
+You can use this as a reference point to create a more complete sync process based on the given requirements.
 
 ```yaml
 # Used to configure the schedule for synchronization. Optional, runs only once if empty.
@@ -260,8 +125,7 @@ sync:
   - actionSpec
 ```
 
-Each sync action specifies one of four modes of operation depending on the specifications.
-You can use this as a reference point to create a more complete sync process based on the given requirements.
+You can find all the Sync Plan specifications in [pkg/apis/v1alpha1/syncjob_types.go](pkg/apis/v1alpha1/syncjob_types.go)
 
 <details>
 <summary>Action Spec: <b>Synchronize a secret from reference</b></summary>
@@ -482,7 +346,7 @@ Standard golang templating is supported for sync action items.
 In addition, functions such as `base64dec` and `base64enc` for decoding/encoding and
 `contains`, `hasPrefix`, `hasSuffix` for string manipulation are also supported.
 
-### CLI
+### Running the synchronization
 
 The CLI tool provides a way to run secret synchronization between secret stores.
 It requires three things:
@@ -493,6 +357,9 @@ It requires three things:
 Note that only YAML configuration files are supported.
 You can also provide optional params for CRON schedule to periodically sync secrets via `--schedule` flag.
 All sync actions are indexed in logs based on their order in the sync plan config file.
+
+You can also use [pkg/storesync](pkg/storesync) package to run secret synchronization plan natively from Golang.
+This is how the CLI works as well.
 
 ## Development
 
@@ -529,13 +396,15 @@ Some linter violations can automatically be fixed:
 make fmt
 ```
 
-## Getting help
+## Useful links
 
-- For feature requests and bugs, file an [issue](https://github.com/bank-vaults/secret-sync/issues).
-- For general discussion about both usage and development:
-  - join the [#secret-sync](https://outshift.slack.com/messages/secret-sync) on the Outshift Slack
-  - open a new [discussion](https://github.com/bank-vaults/secret-sync/discussions)
+- [Contributing guide](https://bank-vaults.dev/docs/contributing/)
+- [Security procedures](https://bank-vaults.dev/docs/security/)
+- [Code of Conduct](https://bank-vaults.dev/docs/code-of-conduct/)
+- Email: [team@bank-vaults.dev](mailto:team@bank-vaults.dev)
 
 ## License
 
 The project is licensed under the [Apache 2.0 License](https://github.com/bank-vaults/secret-sync/blob/master/LICENSE).
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_large)
