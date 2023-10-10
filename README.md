@@ -8,7 +8,7 @@
 
 Secret Sync exposes a generic way to interact with external secret storage systems like
 [HashiCorp Vault](https://www.vaultproject.io/), [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/), [Google Secrets Manager](https://cloud.google.com/secret-manager), [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/), and others.
-It extends this functionality by providing a way to explicitly define how secrets should be synchronized between these stores using a set of API models and custom resources.
+It then builds on it to provide a way to explicitly define how secrets should be synchronized between these stores using a set of API models and custom resources.
 
 This name was chosen in a rush, we are open to naming suggestions 😄
 

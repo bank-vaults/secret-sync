@@ -139,6 +139,8 @@ If successful, your output should contain something like:
 {"level":"info","msg":"Synced 3 out of total 3 keys"}
 ```
 
+You can also navigate to the local Vault instance and verify these secrets.
+
 #### 5.2. Application access secret
 
 To synchronize application access secret from Vault to our local secret store, run:
@@ -148,9 +150,10 @@ secret-sync --target "/tmp/example/local-store.yml" --source "/tmp/example/vault
 ```
 
 If successful, beside logs, you should also be able to find the app access secret via:
+
 ```bash
 cat /tmp/example/local-store/app-access-config
-# {"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
+{"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
 ```
 
 
