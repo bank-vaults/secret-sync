@@ -1,9 +1,11 @@
 # Secret Sync
 
-[![go.dev - references](https://img.shields.io/badge/go.dev-references-047897)](https://pkg.go.dev/github.com/bank-vaults/secret-sync)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_shield)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=flat)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_shield)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
+![Go Version](https://img.shields.io/badge/go%20version-%3E=1.21-61CFDD.svg?style=flat-square)
+[![go.dev - references](https://pkg.go.dev/badge/mod/github.com/bank-vaults/vault-sdk)](https://pkg.go.dev/mod/github.com/bank-vaults/vault-sdk)
+
 
 **Secret Sync** exposes a generic way to interact with external secret storage systems like [HashiCorp Vault](https://www.vaultproject.io/) and provides a set of API models to interact and orchestrate the synchronization of secrets between them.
 
