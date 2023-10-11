@@ -1,14 +1,11 @@
 # Secret Sync
 
-
 [![go.dev - references](https://img.shields.io/badge/go.dev-references-047897)](https://pkg.go.dev/github.com/bank-vaults/secret-sync)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_shield)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
 
-Secret Sync exposes a generic way to interact with external secret storage systems like
-[HashiCorp Vault](https://www.vaultproject.io/), [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/), [Google Secrets Manager](https://cloud.google.com/secret-manager), [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/), and others.
-In addition, it also provides a set of API models and custom resources to explicitly manage the synchronization of secrets between these stores.
+**Secret Sync** exposes a generic way to interact with external secret storage systems like [HashiCorp Vault](https://www.vaultproject.io/) and provides a set of API models to interact and orchestrate the synchronization of secrets between them.
 
 This name was chosen in a rush, we are open to naming suggestions 😄
 
@@ -21,11 +18,10 @@ This name was chosen in a rush, we are open to naming suggestions 😄
 
 ## Features
 
-- Seamless integration with a variety of secret storage systems (stores)
-- User-friendly API for defining synchronization actions on a secret-level
-- Advanced templating capabilities for defining and transforming secrets
-- Facilitate interaction between stores using Golang packages or the CLI
-
+- Simple integration with a variety of secret storage systems
+- User-friendly API to facilitate interaction between different storage systems
+- Pipeline-like syntax for defining synchronization actions on a secret level
+- Advanced templating capabilities for transforming secrets
 
 | **Supported store**                | **Status** |
 |------------------------------------|------------|
@@ -36,8 +32,8 @@ Check details about upcoming features by visiting the [project issue](https://gi
 
 ## Goal
 
-* Provide safe and simple way to consume secrets
-* Common API regardless of the secret store backend
+* Provide safe and simple way to work with secrets
+* Common API for secret management regardless of the store backend
 * Explicit control over the secret synchronization process
 
 > Consider a situation where Dev teams need access to secrets from different environments.
@@ -47,8 +43,8 @@ Check details about upcoming features by visiting the [project issue](https://gi
 
 To get familiarized, we will show how you can use these tools to answer two questions:
 
-- How do I sync secrets from one store to another?
-- How do I consume secrets to bootstrap my configs?
+- **Ops**: How do I synchronize secrets from one secret storage systems to another?
+- **Dev**: How do I consume secrets to bootstrap my application?
 
 To answer the first question, we shall create some database secrets and synchronize them into Vault.<br>
 For the second question, we will use some secrets from Vault to create an access file for an application.
@@ -59,7 +55,7 @@ You can find complete examples and instructions in the [EXAMPLE](EXAMPLE.md) fil
 
 ### Secret Store
 
-Secret store defines the actual secret store that will be used for API requests.
+Secret Store defines the actual external secret storage systems that will be used for API requests.
 In API requests, a secret store can be either a _source_ where the secrets are fetched from or a _target_ where
 the requested secrets are synced into.
 
