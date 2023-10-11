@@ -1,11 +1,9 @@
 # Secret Sync
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync.svg?type=flat)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbank-vaults%2Fsecret-sync?ref=badge_shield)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.21-61CFDD.svg?style=flat-square)
 [![go.dev - references](https://pkg.go.dev/badge/mod/github.com/bank-vaults/vault-sdk)](https://pkg.go.dev/mod/github.com/bank-vaults/vault-sdk)
-
 
 **Secret Sync** exposes a generic way to interact with external secret storage systems like [HashiCorp Vault](https://www.vaultproject.io/) and provides a set of API models to interact and orchestrate the synchronization of secrets between them.
 
@@ -25,10 +23,14 @@ This name was chosen in a rush, we are open to naming suggestions 😄
 - Pipeline-like syntax for defining synchronization actions on a secret level
 - Advanced templating capabilities for transforming secrets
 
-| **Supported store**                | **Status** |
-|------------------------------------|------------|
-| [HashiCorp's Vault](#secret-store) | _alpha_    |
-| [Local](#secret-store)             | _alpha_    |
+| **Supported store**                                                      | **Status** |
+|--------------------------------------------------------------------------|--------|
+| [HashiCorp Vault](https://www.vaultproject.io)                           | alpha  |
+| [Local Provider](#secret-store)                                          | alpha  |
+| [AWS Secrets Manager](https://aws.amazon.com/secrets-manager)            | _planned_ |
+| [Google Secrets Manager](https://cloud.google.com/secret-manager)        | _planned_ |
+| [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/) | _planned_ |
+| [Kubernetes Secret](https://kubernetes.io/)                              | _planned_ |
 
 Check details about upcoming features by visiting the [project issue](https://github.com/bank-vaults/secret-sync/issues) board.
 
@@ -71,11 +73,11 @@ secretsStore:
 You can find all the Secret Store specifications in [pkg/apis/v1alpha1/secretstore.go](pkg/apis/v1alpha1/secretstore.go)
 
 <details>
-<summary>Store Spec: <b>HashiCorp's Vault*</b></summary>
+<summary>Store Spec: <b>HashiCorp Vault*</b></summary>
 
 #### Specs
 
-The following configuration selects [HashiCorp's Vault](https://www.vaultproject.io/) as a secret store.
+The following configuration selects [HashiCorp Vault](https://www.vaultproject.io/) as a secret store.
 ```yaml
 secretsStore:
   vault:
@@ -91,7 +93,7 @@ _*Vault needs to be unsealed_.
 </details>
 
 <details>
-<summary>Store Spec: <b>Local</b></summary>
+<summary>Store Spec: <b>Local Provider</b></summary>
 
 #### Specs
 
