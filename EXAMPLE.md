@@ -2,8 +2,8 @@
 
 To get familiarized, we will show how you can use these tools to answer two questions:
 
-- How do I sync secrets from one store to another?
-- How do I consume secrets to bootstrap my configs?
+- **Ops**: How do I synchronize secrets from one secret storage systems to another?
+- **Dev**: How do I consume secrets to bootstrap my application?
 
 To answer the first question, we shall create some database secrets and synchronize them into Vault.<br>
 For the second question, we will use some secrets from Vault to create an access file for an application.
@@ -31,7 +31,7 @@ alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:
 
 ### 2. Define secret stores
 
-Documentation and examples on how to use different secret stores can be found in chapter [Secret Store](#secret-store).
+Documentation and examples on how to use different secret stores can be found in chapter [Secret Store](README.md#secret-store).
 
 #### 2.1. Local store
 Create a directory and a config file to use as the _local secret store_.
@@ -65,7 +65,7 @@ EOF
 ```
 
 ### 3. Define sync plans
-Documentation and examples on how to create a more extensive sync plan can be found in chapter [Sync Plan](#sync-plan).
+Documentation and examples on how to create a more extensive sync plan can be found in chapter [Sync Plan](README.md#sync-plan).
 
 #### 3.1. Database secrets
 Define a sync plan for `db-host`, `db-user`, `db-pass` secrets.
@@ -120,7 +120,7 @@ echo -n "very-secret-password" > /tmp/example/local-store/db-pass
 
 ### 5. Perform sync
 
-Secret synchronization is performed using the [CLI](#syncing-with-cli) by executing the sync plan between source and target secret stores.
+Secret synchronization is performed using the [CLI](README.md#running-the-synchronization) by executing the sync plan between source and target secret stores.
 
 #### 5.1. Database secrets
 
