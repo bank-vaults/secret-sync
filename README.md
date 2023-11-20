@@ -10,8 +10,6 @@
 
 **Secret Sync** exposes a generic way to interact with external secret storage systems like [HashiCorp Vault](https://www.vaultproject.io/) and provides a set of API models to interact and orchestrate the synchronization of secrets between them.
 
-This name was chosen in a rush, we are open to naming suggestions 😄
-
 > [!IMPORTANT]
 > This is an **early alpha version** and breaking changes are expected.
 > As such, it is not recommended for usage in production.
@@ -27,40 +25,32 @@ This name was chosen in a rush, we are open to naming suggestions 😄
 - Advanced templating capabilities for transforming secrets
 
 | **Supported store**                                                      | **Status** |
-|--------------------------------------------------------------------------|--------|
-| [HashiCorp Vault](https://www.vaultproject.io)                           | alpha  |
-| [Local Provider](#secret-store)                                          | alpha  |
-| [AWS Secrets Manager](https://aws.amazon.com/secrets-manager)            | _planned_ |
-| [Google Secrets Manager](https://cloud.google.com/secret-manager)        | _planned_ |
-| [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/) | _planned_ |
-| [Kubernetes Secret](https://kubernetes.io/)                              | _planned_ |
+|--------------------------------------------------------------------------|------------|
+| [HashiCorp Vault](https://www.vaultproject.io)                           | alpha      |
+| [Local Provider](#secret-store)                                          | alpha      |
+| [AWS Secrets Manager](https://aws.amazon.com/secrets-manager)            | _planned_  |
+| [Google Secrets Manager](https://cloud.google.com/secret-manager)        | _planned_  |
+| [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/) | _planned_  |
+| [Kubernetes Secret](https://kubernetes.io/)                              | _planned_  |
 
 Check details about upcoming features by visiting the [project issue](https://github.com/bank-vaults/secret-sync/issues) board.
 
 ## Goals
 
 * Provide safe and simple way to work with secrets
-* Common API for secret management regardless of the store backend
-* Explicit control over the secret synchronization process
+* Expose common API for secret management regardless of the store backend
+* Give total control of the secret synchronization process
 
 > Consider a situation where Dev teams need access to secrets from different environments.
-> Ops teams can provide access to secrets in the form of a sandboxed environment (e.g. new Vault instance) synced only with secrets Devs require; all in GitOps way.
+> Ops teams can provide access to secrets in the form of an isolated environment (e.g. new Vault instance) synced only with secrets Devs require; all in GitOps way.
 
-## Getting Started
+## Getting started
 
-To get familiarized, we will show how you can use these tools to answer two questions:
-
-- **Ops**: How do I synchronize secrets from one secret storage systems to another?
-- **Dev**: How do I consume secrets to bootstrap my application?
-
-To answer the first question, we shall create some database secrets and synchronize them into Vault.<br>
-For the second question, we will use some secrets from Vault to create an access file for an application.
-
-You can find complete examples and instructions in the [EXAMPLE](EXAMPLE.md) file.
+To get familiarized, check out the collection of different [examples](examples) using this tool.
 
 ## Documentation
 
-Check out the documentation at [API documentation](docs/API.md) page or on [pkg.go.dev](https://pkg.go.dev/mod/github.com/bank-vaults/secret-sync).
+Check out the [project documentation](docs) or [pkg.go.dev](https://pkg.go.dev/mod/github.com/bank-vaults/secret-sync).
 
 ## Development
 

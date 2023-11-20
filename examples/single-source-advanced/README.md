@@ -1,22 +1,23 @@
 ## Getting Started
 
-To get familiarized, we will show how you can use these tools to answer two questions:
+To get familiarized, we will show how you can use Secret Sync tool to cover two scenarios:
 
-- **Ops**: How do I synchronize secrets from one secret storage systems to another?
-- **Dev**: How do I consume secrets to bootstrap my application?
+- **Case 1**: Synchronize secrets from one secret store to another.
+  - We will use our local environment as a source of truth to synchronize some database secrets into Vault.
+- **Case 2**: Consume secrets to bootstrap an application.
+  - We will use Vault instance to fetch database secrets to our local environment in a form of a configuration file for an application.
 
-To answer the first question, we shall create some database secrets and synchronize them into Vault.<br>
-For the second question, we will use some secrets from Vault to create an access file for an application.
+*Note:* The same logic applies to any other combination of secret stores.
 
-### 1. Prepare environment
+### Step 1: Prepare environment
 
 You will need the following tools to continue:
-- Docker
 - Git
 - Makefile
 - Golang `>= 1.21`
 
 To set up the environment, you can build from source:
+
 ```bash
 git clone https://github.com/bank-vaults/secret-sync.git /tmp/secret-sync
 cd /tmp/secret-sync
@@ -25,16 +26,17 @@ alias secret-sync="/tmp/secret-sync/build/secret-sync"
 ```
 
 Alternatively, you can also use only Docker:
+
 ```bash
-alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:latest secret-sync"
+alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:v0.1.0 secret-sync"
 ```
 
-### 2. Define secret stores
+### Step 2: Define secret stores
 
-Documentation and examples on how to use different secret stores can be found in chapter [Secret Store](README.md#secret-store).
+#### Local store
 
-#### 2.1. Local store
 Create a directory and a config file to use as the _local secret store_.
+
 ```bash
 # Create local store directory
 mkdir -p /tmp/example/local-store
@@ -47,8 +49,10 @@ secretsStore:
 EOF
 ```
 
-#### 2.2. Vault store
+#### Vault store
+
 Deploy Vault and create config file to use as the _Vault secret store_.
+
 ```bash
 # Deploy a Vault instance
 docker compose -f dev/vault/docker-compose.yml up -d
@@ -64,12 +68,11 @@ secretsStore:
 EOF
 ```
 
-### 3. Define sync plans
-Documentation and examples on how to create a more extensive sync plan can be found in chapter [Sync Plan](README.md#sync-plan).
+### Step 3: Define sync plans
 
-#### 3.1. Database secrets
-Define a sync plan for `db-host`, `db-user`, `db-pass` secrets.
-These secrets will be synced from our local to Vault secret store.
+#### Database secrets
+
+Define a sync plan for `db-host`, `db-user`, `db-pass` secrets. These secrets will be synced from our local to Vault secret store.
 
 ```bash
 cat <<EOF > /tmp/example/db-secrets-sync.yml
@@ -81,10 +84,9 @@ sync:
 EOF
 ```
 
-#### 3.1. Application access secret
-Define a sync plan for app-specific secret `app-access-config` created from various other secrets (e.g. database).
-This secret will be synced from Vault to our local secret store (as a file).
-It can also be synced against the same store to refresh the secret.
+#### Application access secret
+
+Define a sync plan for app-specific secret `app-access-config` created from various other secrets (e.g. database). This secret will be synced from Vault to our local secret store (as a file). It can also be synced against the same store to refresh the secret.
 
 ```bash
 cat <<EOF > /tmp/example/app-access-config-sync.yml
@@ -109,20 +111,21 @@ sync:
 EOF
 ```
 
-### 4. Create database secrets
+### Step 4: Create database secrets
 
 Create database access secrets in our local secret store.
+
 ```bash
 echo -n "very-secret-hostname" > /tmp/example/local-store/db-host
 echo -n "very-secret-username" > /tmp/example/local-store/db-user
 echo -n "very-secret-password" > /tmp/example/local-store/db-pass
 ```
 
-### 5. Perform sync
+### Step 5: Perform sync
 
-Secret synchronization is performed using the [CLI](README.md#running-the-synchronization) by executing the sync plan between source and target secret stores.
+Secret synchronization is performed using the CLI by executing the sync plan between source and target secret stores.
 
-#### 5.1. Database secrets
+#### Database secrets
 
 To synchronize database secrets from our local to Vault secret store, run:
 
@@ -141,7 +144,7 @@ If successful, your output should contain something like:
 
 You can also navigate to the local Vault instance and verify these secrets.
 
-#### 5.2. Application access secret
+#### Application access secret
 
 To synchronize application access secret from Vault to our local secret store, run:
 
@@ -157,7 +160,7 @@ cat /tmp/example/local-store/app-access-config
 ```
 
 
-### 6. Cleanup
+### Step 6: Cleanup
 
 ```bash
 # Destroy Vault instance
