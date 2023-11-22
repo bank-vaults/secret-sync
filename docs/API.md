@@ -13,8 +13,6 @@ secretsStore:
   storeName: storeSpec
 ```
 
-You can find all the Secret Store specifications in [pkg/apis/v1alpha1/secretstore.go](pkg/apis/v1alpha1/secretstore.go)
-
 <details>
 <summary>Store Spec: <b>HashiCorp Vault*</b></summary>
 
@@ -67,8 +65,6 @@ sync:
   - actionSpec
   - actionSpec
 ```
-
-You can find all the Sync Plan specifications in [pkg/apis/v1alpha1/syncjob_types.go](pkg/apis/v1alpha1/syncjob_types.go)
 
 <details>
 <summary>Action Spec: <b>Synchronize a secret from reference</b></summary>
@@ -302,5 +298,5 @@ Note that only YAML configuration files are supported.
 You can also provide optional params for CRON schedule to periodically sync secrets via `--schedule` flag.
 All sync actions are indexed in logs based on their order in the sync plan config file.
 
-You can also use [pkg/storesync](pkg/storesync) package to run secret synchronization plan natively from Golang.
+You can also use [pkg/storesync](https://pkg.go.dev/github.com/bank-vaults/secret-sync/pkg/storesync) package to run secret synchronization plan natively from Golang.
 This is how the CLI works as well.

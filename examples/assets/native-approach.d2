@@ -1,0 +1,42 @@
+direction: down
+
+Vault: {
+  label: Vault
+  shape: image
+  icon: https://www.svgrepo.com/download/448679/vault.svg
+}
+
+AWSSM: {
+  label: AWS Secrets Manager
+  shape: image
+  icon: https://icons.terrastruct.com/aws%2FSecurity%2C%20Identity%2C%20&%20Compliance%2FAWS-Secrets-Manager.svg
+}
+
+GCPSM: {
+  label: GCP Secret Manager
+  shape: image
+  icon: https://www.svgrepo.com/download/375492/secret-manager.svg
+}
+
+AzureKeyVault: {
+  label: Azure Key Vault
+  shape: image
+  icon: https://icons.terrastruct.com/azure%2FSecurity%20Service%20Color%2FKey%20Vaults.svg
+}
+
+Cluster: {
+  label: Cluster
+  icon: https://icons.terrastruct.com/azure%2F_Companies%2FKubernetes.svg
+
+  Local: {
+    Label: Secret
+  }
+  Workload: Workload
+
+  Local -> Workload
+}
+
+Cluster.Local <- Vault
+Cluster.Local <- AWSSM
+Cluster.Local <- GCPSM
+Cluster.Local <- AzureKeyVault
