@@ -3,9 +3,9 @@
 To get familiarized, we will show how you can use Secret Sync tool to cover two scenarios:
 
 - **Case 1**: Synchronize secrets from one secret store to another.
-  - We will use our local environment as a source of truth to synchronize some database secrets into Vault.
+  - We will use our local file store as a source of truth to synchronize some database secrets into Vault.
 - **Case 2**: Consume secrets to bootstrap an application.
-  - We will use Vault instance to fetch database secrets to our local environment in a form of a configuration file for an application.
+  - We will use Vault instance to fetch database secrets to our local store in a form of a configuration file for an application.
 
 *Note:* The same logic applies to any other combination of secret stores.
 
