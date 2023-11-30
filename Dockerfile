@@ -27,7 +27,7 @@ RUN go build -o /usr/local/bin/secret-sync .
 RUN xx-verify /usr/local/bin/secret-sync
 
 
-FROM alpine:3.18.4@sha256:eece025e432126ce23f223450a0326fbebde39cdf496a85d8c016293fc851978
+FROM alpine:3.18.5@sha256:59a10b97306036510a2d34d4cfc5160c7709d82816296d9ebf06b57671ce10fc
 
 RUN apk add --update --no-cache ca-certificates tzdata
 
