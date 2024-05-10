@@ -1,4 +1,4 @@
-## Getting Started
+# Getting Started
 
 To get familiarized, we will show how you can use Secret Sync tool to cover two scenarios:
 
@@ -9,9 +9,11 @@ To get familiarized, we will show how you can use Secret Sync tool to cover two 
 
 *Note:* The same logic applies to any other combination of secret stores.
 
-### Step 1: Prepare environment
+## Step 1: Prepare environment
 
 You will need the following tools to continue:
+
+- Docker compose
 - Git
 - Makefile
 - Golang `>= 1.21`
@@ -19,51 +21,55 @@ You will need the following tools to continue:
 To set up the environment, you can build from source:
 
 ```bash
-git clone https://github.com/bank-vaults/secret-sync.git /tmp/secret-sync
-cd /tmp/secret-sync
+git clone https://github.com/bank-vaults/secret-sync.git tmp/secret-sync
+cd tmp/secret-sync
+
 make build
-alias secret-sync="/tmp/secret-sync/build/secret-sync"
+alias secret-sync="tmp/secret-sync/build/secret-sync"
 ```
 
 Alternatively, you can also use only Docker:
 
 ```bash
-alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:v0.1.0 secret-sync"
+alias secret-sync="docker run --rm -v tmp:tmp ghcr.io/bank-vaults/secret-sync:v0.1.0 secret-sync"
 ```
 
 ### Step 2: Define secret stores
 
 #### Local store
 
-Create a directory and a config file to use as the _local secret store_.
+Create a directory and a config file to use as the *local secret store*.
 
 ```bash
 # Create local store directory
-mkdir -p /tmp/example/local-store
+mkdir -p tmp/example/local-store
 
 # Create local store config file
-cat <<EOF > /tmp/example/local-store.yml
+cat <<EOF > tmp/example/local-store.yml
 secretsStore:
   local:
-    storePath: "/tmp/example/local-store"
+    storePath: "tmp/example/local-store"
 EOF
 ```
 
 #### Vault store
 
-Deploy Vault and create config file to use as the _Vault secret store_.
+Deploy Vault and create config file to use as the *Vault secret store*.
 
 ```bash
 # Deploy a Vault instance
 docker compose -f dev/vault/docker-compose.yml up -d
 
+# Create an approle at: internal-app
+docker exec -it vault-vault-1 vault auth enable -path=internal-app approle
+
 # Create Vault store config file
-cat <<EOF > /tmp/example/vault-store.yml
+cat <<EOF > tmp/example/vault-store.yml
 secretsStore:
   vault:
     address: "http://0.0.0.0:8200"
-    storePath: "secret/"
-    authPath: "userpass"
+    storePath: "secret"
+    authPath: "internal-app"
     token: "root"
 EOF
 ```
@@ -75,7 +81,7 @@ EOF
 Define a sync plan for `db-host`, `db-user`, `db-pass` secrets. These secrets will be synced from our local to Vault secret store.
 
 ```bash
-cat <<EOF > /tmp/example/db-secrets-sync.yml
+cat <<EOF > tmp/example/db-secrets-sync.yml
 sync:
   - secretQuery:
       path: /
@@ -89,7 +95,7 @@ EOF
 Define a sync plan for app-specific secret `app-access-config` created from various other secrets (e.g. database). This secret will be synced from Vault to our local secret store (as a file). It can also be synced against the same store to refresh the secret.
 
 ```bash
-cat <<EOF > /tmp/example/app-access-config-sync.yml
+cat <<EOF > tmp/example/app-access-config-sync.yml
 sync:
   - secretSources:
       - name: selector
@@ -104,10 +110,9 @@ sync:
         appID: "12345"
         # ...some additional secrets for the given app...
 
-        # Secrets fetched from Vault will be encoded, we need to decode
-        hostname: "{{ .Data.selector.dbHost | base64dec }}"
-        username: "{{ .Data.selector.dbUser | base64dec }}"
-        password: "{{ .Data.selector.dbPass | base64dec }}"
+        hostname: "{{ .Data.selector.dbHost }}"
+        username: "{{ .Data.selector.dbUser }}"
+        password: "{{ .Data.selector.dbPass }}"
 EOF
 ```
 
@@ -116,21 +121,21 @@ EOF
 Create database access secrets in our local secret store.
 
 ```bash
-echo -n "very-secret-hostname" > /tmp/example/local-store/db-host
-echo -n "very-secret-username" > /tmp/example/local-store/db-user
-echo -n "very-secret-password" > /tmp/example/local-store/db-pass
+echo -n "very-secret-hostname" > tmp/example/local-store/db-host
+echo -n "very-secret-username" > tmp/example/local-store/db-user
+echo -n "very-secret-password" > tmp/example/local-store/db-pass
 ```
 
 ### Step 5: Perform sync
 
 Secret synchronization is performed using the CLI by executing the sync plan between source and target secret stores.
 
-#### Database secrets
+#### Synchronize database secrets
 
 To synchronize database secrets from our local to Vault secret store, run:
 
 ```bash
-secret-sync --source "/tmp/example/local-store.yml" --target "/tmp/example/vault-store.yml" --sync "/tmp/example/db-secrets-sync.yml"
+secret-sync --source "tmp/example/local-store.yml" --target "tmp/example/vault-store.yml" --sync "tmp/example/db-secrets-sync.yml"
 ```
 
 If successful, your output should contain something like:
@@ -144,21 +149,26 @@ If successful, your output should contain something like:
 
 You can also navigate to the local Vault instance and verify these secrets.
 
-#### Application access secret
+```bash
+docker exec -it vault-vault-1 vault kv get -mount="secret" "db-user"
+docker exec -it vault-vault-1 vault kv get -mount="secret" "db-pass"
+docker exec -it vault-vault-1 vault kv get -mount="secret" "db-host"
+```
+
+#### Synchronize application access secret
 
 To synchronize application access secret from Vault to our local secret store, run:
 
 ```bash
-secret-sync --target "/tmp/example/local-store.yml" --source "/tmp/example/vault-store.yml" --sync "/tmp/example/app-access-config-sync.yml"
+secret-sync --target "tmp/example/local-store.yml" --source "tmp/example/vault-store.yml" --sync "tmp/example/app-access-config-sync.yml"
 ```
 
-If successful, beside logs, you should also be able to find the app access secret via:
+If successful, beside logs, you should also be able to find the secrets at the target store path:
 
 ```bash
-cat /tmp/example/local-store/app-access-config
+cat tmp/example/local-store/app-access-config
 {"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
 ```
-
 
 ### Step 6: Cleanup
 
@@ -166,6 +176,6 @@ cat /tmp/example/local-store/app-access-config
 # Destroy Vault instance
 docker compose -f dev/vault/docker-compose.yml down
 
-# Remove example files
-rm -rf /tmp/example
+# Remove tmp directory
+rm -rd tmp/
 ```
