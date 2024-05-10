@@ -31,7 +31,7 @@ alias secret-sync="tmp/secret-sync/build/secret-sync"
 Alternatively, you can also use only Docker:
 
 ```bash
-alias secret-sync="docker run --rm -v tmp:tmp ghcr.io/bank-vaults/secret-sync:v0.1.0 secret-sync"
+alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:latest secret-sync"
 ```
 
 ### Step 2: Define secret stores
@@ -60,8 +60,8 @@ Deploy Vault and create config file to use as the *Vault secret store*.
 # Deploy a Vault instance
 docker compose -f dev/vault/docker-compose.yml up -d
 
-# Create an approle at: internal-app
-docker exec -it vault-vault-1 vault auth enable -path=internal-app approle
+# Create an approle at: serviceA
+docker exec -it vault-1 vault auth enable -path=serviceA approle
 
 # Create Vault store config file
 cat <<EOF > tmp/example/vault-store.yml
@@ -69,7 +69,7 @@ secretsStore:
   vault:
     address: "http://0.0.0.0:8200"
     storePath: "secret"
-    authPath: "internal-app"
+    authPath: "serviceA"
     token: "root"
 EOF
 ```
@@ -135,7 +135,10 @@ Secret synchronization is performed using the CLI by executing the sync plan bet
 To synchronize database secrets from our local to Vault secret store, run:
 
 ```bash
-secret-sync --source "tmp/example/local-store.yml" --target "tmp/example/vault-store.yml" --sync "tmp/example/db-secrets-sync.yml"
+secret-sync \
+--source "tmp/example/local-store.yml" \
+--target "tmp/example/vault-store.yml" \
+--sync "tmp/example/db-secrets-sync.yml"
 ```
 
 If successful, your output should contain something like:
@@ -150,9 +153,9 @@ If successful, your output should contain something like:
 You can also navigate to the local Vault instance and verify these secrets.
 
 ```bash
-docker exec -it vault-vault-1 vault kv get -mount="secret" "db-user"
-docker exec -it vault-vault-1 vault kv get -mount="secret" "db-pass"
-docker exec -it vault-vault-1 vault kv get -mount="secret" "db-host"
+docker exec -it vault-1 vault kv get -mount="secret" "db-user"
+docker exec -it vault-1 vault kv get -mount="secret" "db-pass"
+docker exec -it vault-1 vault kv get -mount="secret" "db-host"
 ```
 
 #### Synchronize application access secret
@@ -160,7 +163,10 @@ docker exec -it vault-vault-1 vault kv get -mount="secret" "db-host"
 To synchronize application access secret from Vault to our local secret store, run:
 
 ```bash
-secret-sync --target "tmp/example/local-store.yml" --source "tmp/example/vault-store.yml" --sync "tmp/example/app-access-config-sync.yml"
+secret-sync \
+--target "tmp/example/local-store.yml" \
+--source "tmp/example/vault-store.yml" \
+--sync "tmp/example/app-access-config-sync.yml"
 ```
 
 If successful, beside logs, you should also be able to find the secrets at the target store path:

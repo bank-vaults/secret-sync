@@ -21,7 +21,7 @@ alias secret-sync="build/secret-sync"
 Alternatively, you can also use only Docker:
 
 ```bash
-alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:v0.1.0 secret-sync"
+alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:latest secret-sync"
 ```
 
 ### step 2: Prepare vault instances
@@ -31,18 +31,18 @@ alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:
 mkdir -p tmp/example/
 
 # Deploy the two vault instances
-docker compose -f dev/vault/docker-compose2.yml up -d
+docker compose -f dev/vault/docker-compose.yml up -d
 
-# Enable kv-v2 secrets engine at: internal
-docker exec -it vault-1 vault secrets enable -path=internal kv-v2
-docker exec -it vault-2 vault secrets enable -path=internal kv-v2
+# Enable kv-v2 secrets engine at: serviceA and serviceB
+docker exec -it vault-1 vault secrets enable -path=serviceA kv-v2
+docker exec -it vault-2 vault secrets enable -path=serviceB kv-v2
 
-# Create approles at: internal-app
-docker exec -it vault-1 vault auth enable -path=internal-app approle
-docker exec -it vault-2 vault auth enable -path=internal-app approle
+# Create approles at: serviceA and serviceB
+docker exec -it vault-1 vault auth enable -path=serviceA approle
+docker exec -it vault-2 vault auth enable -path=serviceB approle
 
 # Create the secrets in the source Vault
-docker exec -it vault-1 vault kv put internal/database/config username=user password=pass
+docker exec -it vault-1 vault kv put serviceA/database/config username=user password=pass
 ```
 
 ### Step 3: Define secret stores
@@ -57,8 +57,8 @@ cat <<EOF > tmp/example/vault-store.yml
 secretsStore:
   vault:
     address: "http://127.0.0.1:8200"
-    storePath: "internal"
-    authPath: "internal-app"
+    storePath: "serviceA"
+    authPath: "serviceA"
     token: "root"
 EOF
 
@@ -67,8 +67,8 @@ cat <<EOF > tmp/example/vault-store-2.yml
 secretsStore:
   vault:
     address: "http://127.0.0.1:8201"
-    storePath: "internal"
-    authPath: "internal-app"
+    storePath: "serviceB"
+    authPath: "serviceB"
     token: "root"
 EOF
 ```
@@ -88,12 +88,12 @@ sync:
   - secretRef:
       key: database/config/username
     target:
-      key: database/config/username/username
+      key: database/config/username/username-synced
 
   - secretRef:
       key: database/config/password
     target:
-      key: database/config/password/password
+      key: database/config/password/password-synced
 EOF
 ```
 
@@ -106,7 +106,10 @@ Secret synchronization is performed using the CLI by executing the sync plan bet
 To synchronize the database secrets from the first Vault to the second one, run:
 
 ```bash
-secret-sync --source "tmp/example/vault-store.yml" --target "tmp/example/vault-store-2.yml" --sync "tmp/example/db-secrets-sync-from-vault-to-vault.yml"
+secret-sync \
+--source "tmp/example/vault-store.yml" \
+--target "tmp/example/vault-store-2.yml" \
+--sync "tmp/example/db-secrets-sync-from-vault-to-vault.yml"
 ```
 
 If successful, your output should contain something like:
@@ -118,15 +121,15 @@ Synced 2 out of total 2 keys
 You can also retrieve the secrets from the second vault instances to verify these secrets.
 
 ```bash
-Docker exec -it vault-2 vault kv get -mount="internal" "database/config/username"
-Docker exec -it vault-2 vault kv get -mount="internal" "database/config/password"
+docker exec -it vault-2 vault kv get -mount="serviceB" "database/config/username"
+docker exec -it vault-2 vault kv get -mount="serviceB" "database/config/password"
 ```
 
 ### Step 6: Cleanup
 
 ```bash
 # Destroy Vault instances
-docker compose -f dev/vault/docker-compose2.yml down
+docker compose -f dev/vault/docker-compose.yml down
 
 # Remove tmp directory
 rm -rd tmp/
