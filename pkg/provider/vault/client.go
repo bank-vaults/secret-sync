@@ -31,10 +31,10 @@ type client struct {
 	apiKeyPath string
 }
 
-func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, error) {
+func (c *client) GetSecret(ctx context.Context, key v1alpha1.SecretRef) ([]byte, error) {
 	// Get secret from API
-	keyPath := pathForKey(key)
-	response, err := c.apiClient.RawClient().Logical().Read(fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath))
+	path := fmt.Sprintf("%s/data/%s", c.apiKeyPath, pathForKey(key))
+	response, err := c.apiClient.RawClient().Logical().ReadWithContext(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("api get request failed: %w", err)
 	}
@@ -111,17 +111,16 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 	return result, nil
 }
 
-func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []byte) error {
+func (c *client) SetSecret(ctx context.Context, key v1alpha1.SecretRef, value []byte) error {
 	// Write secret to API
-	keyPath := pathForKey(key)
-	_, err := c.apiClient.RawClient().Logical().Write(
-		fmt.Sprintf("%s/data/%s", c.apiKeyPath, keyPath),
-		map[string]interface{}{
-			"data": map[string]interface{}{
-				key.GetName(): value,
-			},
+	path := fmt.Sprintf("%s/data/%s", c.apiKeyPath, pathForKey(key))
+	data := map[string]interface{}{
+		"data": map[string]interface{}{
+			key.GetName(): string(value),
 		},
-	)
+	}
+
+	_, err := c.apiClient.RawClient().Logical().WriteWithContext(ctx, path, data)
 	if err != nil {
 		return fmt.Errorf("api set request failed: %w", err)
 	}
@@ -133,8 +132,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []by
 // Not used since it has high memory footprint and does not handle search.
 // It could (potentially) be useful.
 // DEPRECATED
-//nolint
-func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) {
+func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) { //nolint
 	// List API request
 	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))
 	if err != nil {
@@ -181,5 +179,10 @@ func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.Sec
 }
 
 func pathForKey(key v1alpha1.SecretRef) string {
-	return strings.Join(append(key.GetPath(), key.GetName()), "/")
+	// If key has no path, return name as path
+	if len(key.GetPath()) == 0 {
+		return key.GetName()
+	}
+
+	return strings.Join(key.GetPath(), "/")
 }
