@@ -13,9 +13,11 @@ You will need the following tools to continue:
 To set up the environment, you can build from source:
 
 ```bash
-make build
+git clone https://github.com/bank-vaults/secret-sync.git /tmp/secret-sync
+cd /tmp/secret-sync
 
-alias secret-sync="build/secret-sync"
+make build
+alias secret-sync="/tmp/secret-sync/build/secret-sync"
 ```
 
 Alternatively, you can also use only Docker:
@@ -28,7 +30,7 @@ alias secret-sync="docker run --rm -v /tmp:/tmp ghcr.io/bank-vaults/secret-sync:
 
 ```bash
 # Create a directory for the examples
-mkdir -p tmp/example/
+mkdir -p /tmp/example/
 
 # Deploy the two vault instances
 docker compose -f dev/vault/docker-compose.yml up -d
@@ -53,7 +55,7 @@ Create the config files to use as *Vault secret stores*.
 
 ```bash
 # Create the first Vault store config file
-cat <<EOF > tmp/example/vault-store.yml
+cat <<EOF > /tmp/example/vault-store.yml
 secretsStore:
   vault:
     address: "http://127.0.0.1:8200"
@@ -63,7 +65,7 @@ secretsStore:
 EOF
 
 # Create the second Vault store config file
-cat <<EOF > tmp/example/vault-store-2.yml
+cat <<EOF > /tmp/example/vault-store-2.yml
 secretsStore:
   vault:
     address: "http://127.0.0.1:8201"
@@ -83,7 +85,7 @@ Define a sync plan for the secrets:
 These secrets will be synced from the first vault to the second vault secret store.
 
 ```bash
-cat <<EOF > tmp/example/db-secrets-sync-from-vault-to-vault.yml
+cat <<EOF > /tmp/example/db-secrets-sync-from-vault-to-vault.yml
 sync:
   - secretRef:
       key: database/config/username
@@ -107,9 +109,9 @@ To synchronize the database secrets from the first Vault to the second one, run:
 
 ```bash
 secret-sync \
---source "tmp/example/vault-store.yml" \
---target "tmp/example/vault-store-2.yml" \
---sync "tmp/example/db-secrets-sync-from-vault-to-vault.yml"
+--source "/tmp/example/vault-store.yml" \
+--target "/tmp/example/vault-store-2.yml" \
+--sync "/tmp/example/db-secrets-sync-from-vault-to-vault.yml"
 ```
 
 If successful, your output should contain something like:
@@ -131,6 +133,7 @@ docker exec -it vault-2 vault kv get -mount="serviceB" "database/config/password
 # Destroy Vault instances
 docker compose -f dev/vault/docker-compose.yml down
 
-# Remove tmp directory
-rm -rd tmp/
+# Remove example assets
+rm -rd /tmp/example
+rm -rd /tmp/secret-sync
 ```
