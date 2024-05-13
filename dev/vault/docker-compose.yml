@@ -1,10 +1,21 @@
-version: '3'
-
 services:
-  vault:
+  vault-1:
+    container_name: vault-1
     image: hashicorp/vault:latest
     ports:
       - 8200:8200
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+    cap_add:
+      - IPC_LOCK
+    entrypoint: vault server -dev -dev-listen-address="0.0.0.0:8200" -dev-root-token-id="root"
+
+  vault-2:
+    container_name: vault-2
+    image: hashicorp/vault:latest
+    ports:
+      - 8201:8200
     environment:
       VAULT_ADDR: "http://0.0.0.0:8200"
       VAULT_API_ADDR: "http://0.0.0.0:8200"

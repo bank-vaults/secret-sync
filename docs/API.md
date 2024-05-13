@@ -1,6 +1,6 @@
-## API Documentation
+# API Documentation
 
-### Secret Store
+## Secret Store
 
 Secret Store defines the actual external secret storage systems that will be used for API requests.
 In API requests, a secret store can be either a _source_ where the secrets are fetched from or a _target_ where
@@ -16,9 +16,10 @@ secretsStore:
 <details>
 <summary>Store Spec: <b>HashiCorp Vault*</b></summary>
 
-#### Specs
+### Specs
 
 The following configuration selects [HashiCorp Vault](https://www.vaultproject.io/) as a secret store.
+
 ```yaml
 secretsStore:
   vault:
@@ -29,6 +30,7 @@ secretsStore:
     tokenPath: "<Local path to Vault token>"
     token: "<Vault token>"
 ```
+
 _*Vault needs to be unsealed_.
 
 </details>
@@ -36,17 +38,19 @@ _*Vault needs to be unsealed_.
 <details>
 <summary>Store Spec: <b>Local Provider</b></summary>
 
-#### Specs
+### Specs
 
 Use this configuration to specify a local directory as a secret store.
 Secrets are represented as unencrypted files within that directory,
 where filenames define secret keys and file contents the secret values.
 This store is useful for local secret consumption.
+
 ```yaml
 secretsStore:
   local:
     storePath: "path/to/local-dir"
 ```
+
 </details>
 
 ### Sync Plan
@@ -69,7 +73,7 @@ sync:
 <details>
 <summary>Action Spec: <b>Synchronize a secret from reference</b></summary>
 
-#### Specs
+### Specs
 
 ```yaml
 sync:
@@ -96,6 +100,7 @@ sync:
 #### Example
 
 Synchronize a single `/tenant-1/db-username` from the source store to `/remote-db-username` on the target store.
+
 ```yaml
 sync:
 - secretRef:
@@ -109,7 +114,7 @@ sync:
 <details>
 <summary>Action Spec: <b>Synchronize multiple secrets from a query</b></summary>
 
-#### Specs
+### Specs
 
 ```yaml
 sync:
@@ -139,9 +144,10 @@ sync:
         secretPassword: '{{ .Data }}'
 ```
 
-#### Example
+### Example
 
 Synchronize all secrets that match `/tenant-1/db-*` regex from the source store to `/remote-<key>` on the target store.
+
 ```yaml
 sync:
 - secretQuery:
@@ -157,7 +163,7 @@ sync:
 <details>
 <summary>Action Spec: <b>Synchronize a secret from a query</b></summary>
 
-#### Specs
+### Specs
 
 ```yaml
 sync:
@@ -186,7 +192,7 @@ sync:
         secret: '{{ .Data.someKeyPrefix1 }}'
 ```
 
-#### Example
+### Example
 
 Fetch secrets that match `/tenant-1/db-(username|password)` regex from source store and use them
 to create a new (combined) db access secret on the target store.
@@ -213,7 +219,7 @@ sync:
 <details>
 <summary>Action Spec: <b>Synchronize a secret from multiple queries and references</b></summary>
 
-#### Specs
+### Specs
 
 ```yaml
 sync:
@@ -249,7 +255,7 @@ sync:
         secret2: '{{ .Data.actionQuery.someKeyPrefix1 }}'
 ```
 
-#### Example
+### Example
 
 Fetch secrets that match `/db-(1|2)/(username|password)` regex from source store and use them
 to create a new (combined) db access secret on the target store.
@@ -285,11 +291,11 @@ Standard golang templating is supported for sync action items.
 In addition, functions such as `base64dec` and `base64enc` for decoding/encoding and
 `contains`, `hasPrefix`, `hasSuffix` for string manipulation are also supported.
 
-
 ### Running the synchronization
 
 The CLI tool provides a way to run secret synchronization between secret stores.
 It requires three things:
+
 - Path to _source store_ config file via `--source` flag
 - Path to _target store_ config file via `--target` flag
 - Path to _sync plan_ config file via `--plan` flag

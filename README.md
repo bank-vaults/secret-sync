@@ -3,7 +3,6 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/bank-vaults/secret-sync?style=flat-square)](https://goreportcard.com/report/github.com/bank-vaults/secret-sync)
 ![Go Version](https://img.shields.io/badge/go%20version-%3E=1.21-61CFDD.svg?style=flat-square)
 [![go.dev - references](https://pkg.go.dev/badge/mod/github.com/bank-vaults/secret-sync)](https://pkg.go.dev/mod/github.com/bank-vaults/secret-sync)
-<br>
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bank-vaults/secret-sync/ci.yaml?branch=main&style=flat-square)](https://github.com/bank-vaults/secret-sync/actions/workflows/ci.yaml?query=workflow%3ACI)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/bank-vaults/secret-sync/badge?style=flat-square)](https://api.securityscorecards.dev/projects/github.com/bank-vaults/secret-sync)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8055/badge)](https://www.bestpractices.dev/projects/8055)
@@ -27,7 +26,7 @@
 | **Supported store**                                                      | **Status** |
 |--------------------------------------------------------------------------|------------|
 | [HashiCorp Vault](https://www.vaultproject.io)                           | alpha      |
-| [Local Provider](#secret-store)                                          | alpha      |
+| [Local Provider]                                                         | alpha      |
 | [AWS Secrets Manager](https://aws.amazon.com/secrets-manager)            | _planned_  |
 | [Google Secrets Manager](https://cloud.google.com/secret-manager)        | _planned_  |
 | [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/) | _planned_  |
@@ -37,9 +36,9 @@ Check details about upcoming features by visiting the [project issue](https://gi
 
 ## Goals
 
-* Provide safe and simple way to work with secrets
-* Expose common API for secret management regardless of the store backend
-* Give total control of the secret synchronization process
+- Provide safe and simple way to work with secrets
+- Expose common API for secret management regardless of the store backend
+- Give total control of the secret synchronization process
 
 > Consider a situation where Dev teams need access to secrets from different environments.
 > Ops teams can provide access to secrets in the form of an isolated environment (e.g. new Vault instance) synced only with secrets Devs require; all in GitOps way.

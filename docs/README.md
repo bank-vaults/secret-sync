@@ -1,4 +1,4 @@
-## Documentation
+# Documentation
 
 Here you can find documentation about the way **Secret Sync** works. Refer to:
 

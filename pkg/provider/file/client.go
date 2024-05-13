@@ -49,6 +49,10 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 	// Add all files that match filter from queried dir
 	var result []v1alpha1.SecretRef
 	err := filepath.WalkDir(queryDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("list failed to walk dir: %w", err)
+		}
+
 		// Only add files
 		if entry != nil && entry.Type().IsRegular() {
 			// Extract secret key from the relative OS system path
