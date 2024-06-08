@@ -44,7 +44,7 @@
               goreleaser
 
               yamllint
-              # hadolint
+              hadolint
             ] ++ [
               self'.packages.licensei
               self'.packages.golangci-lint

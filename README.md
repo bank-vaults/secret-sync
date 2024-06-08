@@ -57,10 +57,12 @@ Check out the [project documentation](docs) or [pkg.go.dev](https://pkg.go.dev/m
 
 _Alternatively, install [Go](https://go.dev/dl/) on your computer then run `make deps` to install the rest of the dependencies._
 
-Fetch required tools:
+Make sure Docker is installed with Compose and Buildx.
+
+Run project dependencies:
 
 ```shell
-make deps
+make up
 ```
 
 Build the CLI:
@@ -85,6 +87,22 @@ Some linter violations can automatically be fixed:
 
 ```shell
 make fmt
+```
+
+Build artifacts locally:
+
+```shell
+make artifacts
+```
+
+Once you are done either stop or tear down dependencies:
+
+```shell
+make stop
+
+# OR
+
+make down
 ```
 
 ## License
