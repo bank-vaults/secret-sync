@@ -58,10 +58,10 @@ Deploy Vault and create config file to use as the *Vault secret store*.
 
 ```bash
 # Deploy a Vault instance
-docker compose -f dev/vault/docker-compose.yml up -d
+make up
 
 # Create an approle at: serviceA
-docker exec -it vault-1 vault auth enable -path=serviceA approle
+docker exec -it secret-sync-vault-1 vault auth enable -path=serviceA approle
 
 # Create Vault store config file
 cat <<EOF > /tmp/example/vault-store.yml
@@ -70,7 +70,7 @@ secretsStore:
     address: "http://0.0.0.0:8200"
     storePath: "secret"
     authPath: "serviceA"
-    token: "root"
+    token: "227e1cce-6bf7-30bb-2d2a-acc854318caf"
 EOF
 ```
 
@@ -144,18 +144,18 @@ secret-sync \
 If successful, your output should contain something like:
 
 ```json
-{"level":"info","msg":"Successfully synced action = 0 for key /db-user"}
-{"level":"info","msg":"Successfully synced action = 0 for key /db-pass"}
-{"level":"info","msg":"Successfully synced action = 0 for key /db-host"}
-{"level":"info","msg":"Synced 3 out of total 3 keys"}
+{"level":"INFO","msg":"Successfully synced action","app":"secret-sync","id":0,"key":"/db-pass"}
+{"level":"INFO","msg":"Successfully synced action","app":"secret-sync","id":0,"key":"/db-host"}
+{"level":"INFO","msg":"Successfully synced action","app":"secret-sync","id":0,"key":"/db-user"}
+{"level":"INFO","msg":"Synced 3 out of total 3 keys","app":"secret-sync"}
 ```
 
 You can also navigate to the local Vault instance and verify these secrets.
 
 ```bash
-docker exec -it vault-1 vault kv get -mount="secret" "db-user"
-docker exec -it vault-1 vault kv get -mount="secret" "db-pass"
-docker exec -it vault-1 vault kv get -mount="secret" "db-host"
+docker exec -it secret-sync-vault-1 vault kv get -mount="secret" "db-user"
+docker exec -it secret-sync-vault-1 vault kv get -mount="secret" "db-pass"
+docker exec -it secret-sync-vault-1 vault kv get -mount="secret" "db-host"
 ```
 
 #### Synchronize application access secret
@@ -169,7 +169,14 @@ secret-sync \
 --sync "/tmp/example/app-access-config-sync.yml"
 ```
 
-If successful, beside logs, you should also be able to find the secrets at the target store path:
+If successful, beside logs:
+
+```json
+{"level":"INFO","msg":"Successfully synced action","app":"secret-sync","id":0,"key":"app-access-config"}
+{"level":"INFO","msg":"Synced 1 out of total 1 keys","app":"secret-sync"}
+```
+
+You should also be able to find the secrets at the target store path:
 
 ```bash
 cat /tmp/example/local-store/app-access-config
@@ -180,7 +187,7 @@ cat /tmp/example/local-store/app-access-config
 
 ```bash
 # Destroy Vault instance
-docker compose -f dev/vault/docker-compose.yml down
+make down
 
 # Remove example assets
 rm -rd /tmp/example
