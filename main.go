@@ -1,4 +1,4 @@
-// Copyright © 2023 Bank-Vaults Maintainers
+// Copyright © 2024 Bank-Vaults Maintainers
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +15,89 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
+	"context"
+	"fmt"
+	"log/slog"
+	"net"
+	"os"
+	"slices"
+
+	slogmulti "github.com/samber/slog-multi"
+	slogsyslog "github.com/samber/slog-syslog"
 
 	"github.com/bank-vaults/secret-sync/cmd"
+	"github.com/bank-vaults/secret-sync/pkg/common"
 )
 
 func main() {
-	if err := cmd.NewSyncCmd().Execute(); err != nil {
-		logrus.Fatalf("error executing command: %v", err)
+	config, err := common.LoadConfig()
+	if err != nil {
+		slog.Error(fmt.Errorf("error loading config: %w", err).Error())
 	}
+
+	initLogger(config)
+
+	if err := cmd.NewSyncCmd().Execute(); err != nil {
+		slog.Error(fmt.Errorf("error executing command: %w", err).Error())
+	}
+}
+
+func initLogger(config *common.Config) {
+	var level slog.Level
+
+	err := level.UnmarshalText([]byte(config.LogLevel))
+	if err != nil { // Silently fall back to info level
+		level = slog.LevelInfo
+	}
+
+	levelFilter := func(levels ...slog.Level) func(ctx context.Context, r slog.Record) bool {
+		return func(_ context.Context, r slog.Record) bool {
+			return slices.Contains(levels, r.Level)
+		}
+	}
+
+	router := slogmulti.Router()
+
+	if config.JSONLog {
+		// Send logs with level higher than warning to stderr
+		router = router.Add(
+			slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}),
+			levelFilter(slog.LevelWarn, slog.LevelError),
+		)
+
+		// Send info and debug logs to stdout
+		router = router.Add(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+			levelFilter(slog.LevelDebug, slog.LevelInfo),
+		)
+	} else {
+		// Send logs with level higher than warning to stderr
+		router = router.Add(
+			slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}),
+			levelFilter(slog.LevelWarn, slog.LevelError),
+		)
+
+		// Send info and debug logs to stdout
+		router = router.Add(
+			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+			levelFilter(slog.LevelDebug, slog.LevelInfo),
+		)
+	}
+
+	if config.LogServer != "" {
+		writer, err := net.Dial("udp", config.LogServer)
+
+		// We silently ignore syslog connection errors for the lack of a better solution
+		if err == nil {
+			router = router.Add(slogsyslog.Option{Level: slog.LevelInfo, Writer: writer}.NewSyslogHandler())
+		}
+	}
+
+	// TODO: add level filter handler
+	logger := slog.New(router.Handler())
+	logger = logger.With(slog.String("app", "secret-sync"))
+
+	// Set the default logger to the configured logger,
+	// enabling direct usage of the slog package for logging.
+	slog.SetDefault(logger)
 }

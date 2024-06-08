@@ -1,4 +1,4 @@
-// Copyright © 2023 Bank-Vaults Maintainers
+// Copyright © 2024 Bank-Vaults Maintainers
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"os/signal"
 
 	"github.com/ghodss/yaml"
 	"github.com/krayzpipes/cronticker/cronticker"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
@@ -114,7 +114,7 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 		if err != nil {
 			return err
 		}
-		logrus.Info(resp.Status)
+		slog.Info(resp.Status)
 		return nil
 	}
 
@@ -129,12 +129,12 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	for {
 		select {
 		case <-cronTicker.C:
-			logrus.Info("Handling a new sync request...")
+			slog.Info("Handling a new sync request...")
 			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.target, syncReq.Sync)
 			if err != nil {
 				return err
 			}
-			logrus.Info(resp.Status)
+			slog.Info(resp.Status)
 
 		case <-cancel:
 			return nil
