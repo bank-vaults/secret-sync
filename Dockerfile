@@ -23,7 +23,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o /usr/local/bin/secret-sync .
+RUN go build -o /usr/local/bin/secret-sync ./cmd/
 RUN xx-verify /usr/local/bin/secret-sync
 
 

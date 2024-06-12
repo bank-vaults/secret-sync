@@ -1,3 +1,5 @@
+version: 2
+
 project_name: secret-sync
 
 dist: build/dist
@@ -8,7 +10,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-    main: .
+    main: ./cmd/
     goos:
       - linux
       - darwin
