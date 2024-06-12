@@ -25,24 +25,23 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 	slogsyslog "github.com/samber/slog-syslog"
 
-	"github.com/bank-vaults/secret-sync/cmd"
-	"github.com/bank-vaults/secret-sync/pkg/common"
+	"github.com/bank-vaults/secret-sync/pkg/config"
 )
 
 func main() {
-	config, err := common.LoadConfig()
+	config, err := config.LoadConfig()
 	if err != nil {
 		slog.Error(fmt.Errorf("error loading config: %w", err).Error())
 	}
 
 	initLogger(config)
 
-	if err := cmd.NewSyncCmd().Execute(); err != nil {
+	if err := NewSyncCmd().Execute(); err != nil {
 		slog.Error(fmt.Errorf("error executing command: %w", err).Error())
 	}
 }
 
-func initLogger(config *common.Config) {
+func initLogger(config *config.Config) {
 	var level slog.Level
 
 	err := level.UnmarshalText([]byte(config.LogLevel))

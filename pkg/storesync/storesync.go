@@ -69,7 +69,7 @@ func Sync(ctx context.Context,
 				// Fetch keys to store
 				requests, err := processor.GetSyncRequests(fetchCtx, id, action)
 				if err != nil {
-					slog.Warn("Failed to fetch sync action", slog.Any("id", id), slog.Any("err", err), slog.Any("z-req", requests))
+					slog.Warn(fmt.Sprintf("Failed to fetch sync action: %v", err), slog.Any("id", id))
 					return nil
 				}
 
@@ -113,9 +113,9 @@ func Sync(ctx context.Context,
 			// Handle response
 			if err != nil {
 				if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-					slog.Warn("Skipped sync action", slog.Any("id", req.RequestID), slog.Any("key", ref.Key), slog.Any("err", err), slog.Any("z-req", req.ActionRef))
+					slog.Warn(fmt.Sprintf("Skipped sync action: %v", err), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 				} else { // otherwise, log error
-					slog.Error("Failed to sync action", slog.Any("id", req.RequestID), slog.Any("key", ref.Key), slog.Any("err", err), slog.Any("z-req", req.ActionRef))
+					slog.Error(fmt.Errorf("failed to sync action: %w", err).Error(), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 				}
 				return
 			}
