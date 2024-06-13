@@ -25,6 +25,7 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 	slogsyslog "github.com/samber/slog-syslog"
 
+	"github.com/bank-vaults/secret-sync/cmd/sync"
 	"github.com/bank-vaults/secret-sync/pkg/config"
 )
 
@@ -36,7 +37,7 @@ func main() {
 
 	initLogger(config)
 
-	if err := NewSyncCmd().Execute(); err != nil {
+	if err := sync.NewSyncCmd().Execute(); err != nil {
 		slog.Error(fmt.Errorf("error executing command: %w", err).Error())
 	}
 }
