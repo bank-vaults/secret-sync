@@ -122,7 +122,7 @@ If successful, your output should contain something like:
 {"level":"INFO","msg":"Synced 2 out of total 2 keys","app":"secret-sync"}
 ```
 
-You can also retrieve the secrets from the second vault instances to verify these secrets.
+You can also retrieve the secrets from the second Vault instance to verify that the synchronization was successful.
 
 ```bash
 docker exec -it secret-sync-vault-2 vault kv get -mount="serviceB" "database/config/username"
