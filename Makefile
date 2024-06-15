@@ -31,7 +31,7 @@ down: ## Destroy development environment
 .PHONY: build
 build: ## Build binary
 	@mkdir -p build
-	go build -race -o build/
+	go build -race -o build/ ./cmd/
 
 .PHONY: container-image
 container-image: ## Build container image

@@ -1,4 +1,4 @@
-// Copyright © 2023 Bank-Vaults Maintainers
+// Copyright © 2024 Bank-Vaults Maintainers
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package config
 
 import (
-	"github.com/sirupsen/logrus"
+	"os"
 
-	"github.com/bank-vaults/secret-sync/cmd"
+	"github.com/spf13/cast"
 )
 
-func main() {
-	if err := cmd.NewSyncCmd().Execute(); err != nil {
-		logrus.Fatalf("error executing command: %v", err)
-	}
+const (
+	LogLevelEnv  = "SECRET_SYNC_LOG_LEVEL"
+	JSONLogEnv   = "SECRET_SYNC_JSON_LOG"
+	LogServerEnv = "SECRET_SYNC_LOG_SERVER"
+)
+
+type Config struct {
+	LogLevel  string `json:"log_level"`
+	JSONLog   bool   `json:"json_log"`
+	LogServer string `json:"log_server"`
+}
+
+func LoadConfig() (*Config, error) {
+	return &Config{
+		LogLevel:  os.Getenv(LogLevelEnv),
+		JSONLog:   cast.ToBool(os.Getenv(JSONLogEnv)),
+		LogServer: os.Getenv(LogServerEnv),
+	}, nil
 }

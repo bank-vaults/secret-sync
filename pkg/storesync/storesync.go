@@ -19,11 +19,11 @@ package storesync
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
@@ -69,7 +69,7 @@ func Sync(ctx context.Context,
 				// Fetch keys to store
 				requests, err := processor.GetSyncRequests(fetchCtx, id, action)
 				if err != nil {
-					logrus.WithField("z-req", requests).Warnf("Failed to fetch sync action = %d, reason: %v", id, err)
+					slog.Warn(fmt.Sprintf("Failed to fetch sync action: %v", err), slog.Any("id", id))
 					return nil
 				}
 
@@ -113,17 +113,13 @@ func Sync(ctx context.Context,
 			// Handle response
 			if err != nil {
 				if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-					logrus.WithField("z-req", req.ActionRef).
-						Warnf("Skipped sync action = %d for key %s, reason: %v", req.RequestID, ref.Key, err)
+					slog.Warn(fmt.Sprintf("Skipped sync action: %v", err), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 				} else { // otherwise, log error
-					logrus.WithField("z-req", req.ActionRef).
-						Errorf("Failed to sync action = %d for key %s, reason: %v", req.RequestID, ref.Key, err)
+					slog.Error(fmt.Errorf("failed to sync action: %w", err).Error(), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 				}
 				return
 			}
-
-			logrus.WithField("z-req", req.ActionRef).
-				Infof("Successfully synced action = %d for key %s", req.RequestID, ref.Key /* , string(plan.Data) */)
+			slog.Info("Successfully synced action", slog.Any("id", req.RequestID), slog.Any("key", ref.Key) /* , string(plan.Data) */)
 			syncCounter.Add(1)
 		}(ref, req)
 	}

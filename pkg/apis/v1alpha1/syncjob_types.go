@@ -1,4 +1,4 @@
-// Copyright © 2023 Bank-Vaults Maintainers
+// Copyright © 2024 Bank-Vaults Maintainers
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 package v1alpha1
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/robfig/cron"
-	"github.com/sirupsen/logrus"
 )
 
 var DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
@@ -48,7 +49,7 @@ func (spec *SyncJob) GetSchedule() *string {
 		return nil
 	}
 	if _, err := cron.Parse(spec.Schedule); err != nil {
-		logrus.Errorf("skipping Schedule due to parse error: %v", err)
+		slog.Error(fmt.Errorf("skipping Schedule due to parse error: %w", err).Error())
 		return nil
 	}
 
