@@ -31,7 +31,7 @@ down: ## Destroy development environment
 .PHONY: build
 build: ## Build binary
 	@mkdir -p build
-	go build -race -o build/ ./cmd/
+	go build -race -o build/secret-sync ./cmd/
 
 .PHONY: container-image
 container-image: ## Build container image
@@ -85,7 +85,7 @@ deps: bin/golangci-lint bin/licensei bin/cosign bin/goreleaser
 deps: ## Install dependencies
 
 # Dependency versions
-GOLANGCI_VERSION = 1.59.0
+GOLANGCI_VERSION = 1.59.1
 LICENSEI_VERSION = 0.9.0
 COSIGN_VERSION = 2.2.4
 GORELEASER_VERSION = 2.0.0

@@ -18,6 +18,7 @@ package storesync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -28,6 +29,8 @@ import (
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
+
+var syncMu sync.Mutex
 
 // Status defines response data returned by Sync.
 type Status struct {
@@ -46,30 +49,32 @@ func Sync(ctx context.Context,
 ) (*Status, error) {
 	// Validate
 	if source == nil {
-		return nil, fmt.Errorf("source is nil")
+		return nil, errors.New("source is nil")
 	}
+
 	if target == nil {
-		return nil, fmt.Errorf("target is nil")
+		return nil, errors.New("target is nil")
 	}
+
 	if len(actions) == 0 {
-		return nil, fmt.Errorf("nothing to sync")
+		return nil, errors.New("no actions provided")
 	}
 
 	// Define data stores
-	syncMu := sync.Mutex{}
 	syncRequests := make(map[v1alpha1.SecretRef]syncRequest)
 	processor := newProcessor(source)
 
 	// Get sync plan for each request in a separate goroutine.
 	// If the same secret needs to be synced more than once, abort sync.
 	fetchGroup, fetchCtx := errgroup.WithContext(ctx)
+
 	for id, action := range actions {
 		func(id int, action v1alpha1.SyncAction) {
 			fetchGroup.Go(func() error {
 				// Fetch keys to store
 				requests, err := processor.GetSyncRequests(fetchCtx, id, action)
 				if err != nil {
-					slog.Warn(fmt.Sprintf("Failed to fetch sync action: %v", err), slog.Any("id", id))
+					slog.WarnContext(ctx, fmt.Sprintf("Failed to fetch sync action: %v", err), slog.Any("id", id))
 					return nil
 				}
 
@@ -81,8 +86,10 @@ func Sync(ctx context.Context,
 						// This is a critical error; stop everything
 						return fmt.Errorf("key %v was schedule for sync more than once", ref)
 					}
+
 					syncRequests[ref] = request
 				}
+
 				return nil
 			})
 		}(id, action)
@@ -105,21 +112,22 @@ func Sync(ctx context.Context,
 			// Sync
 			var err error
 			if len(req.Data) == 0 {
-				err = fmt.Errorf("empty value")
+				err = errors.New("empty value")
 			} else {
 				err = target.SetSecret(ctx, ref, req.Data)
 			}
 
 			// Handle response
 			if err != nil {
-				if err == v1alpha1.ErrKeyNotFound { // not found, soft warn
-					slog.Warn(fmt.Sprintf("Skipped sync action: %v", err), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
+				if errors.Is(err, v1alpha1.ErrKeyNotFound) { // not found, soft warn
+					slog.WarnContext(ctx, fmt.Sprintf("Skipped sync action: %v", err), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 				} else { // otherwise, log error
-					slog.Error(fmt.Errorf("failed to sync action: %w", err).Error(), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
+					slog.ErrorContext(ctx, fmt.Errorf("failed to sync action: %w", err).Error(), slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 				}
+
 				return
 			}
-			slog.Info("Successfully synced action", slog.Any("id", req.RequestID), slog.Any("key", ref.Key) /* , string(plan.Data) */)
+			slog.InfoContext(ctx, "Successfully synced action", slog.Any("id", req.RequestID), slog.Any("key", ref.Key))
 			syncCounter.Add(1)
 		}(ref, req)
 	}
@@ -128,6 +136,7 @@ func Sync(ctx context.Context,
 	// Return response
 	syncCount := syncCounter.Load()
 	totalCount := uint32(len(syncRequests))
+
 	return &Status{
 		Total:    totalCount,
 		Synced:   syncCount,

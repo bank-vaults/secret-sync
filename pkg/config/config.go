@@ -32,10 +32,10 @@ type Config struct {
 	LogServer string `json:"log_server"`
 }
 
-func LoadConfig() (*Config, error) {
+func LoadConfig() *Config {
 	return &Config{
 		LogLevel:  os.Getenv(LogLevelEnv),
 		JSONLog:   cast.ToBool(os.Getenv(JSONLogEnv)),
 		LogServer: os.Getenv(LogServerEnv),
-	}, nil
+	}
 }

@@ -16,7 +16,7 @@ package file
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
@@ -31,11 +31,13 @@ func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreSpec
 
 func (p *Provider) Validate(backend v1alpha1.SecretStoreSpec) error {
 	if backend.Local == nil {
-		return fmt.Errorf("empty .Local")
+		return errors.New("empty .Local")
 	}
+
 	if backend.Local.StorePath == "" {
-		return fmt.Errorf("empty .Local.StorePath")
+		return errors.New("empty .Local.StorePath")
 	}
+
 	return nil
 }
 

@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,6 +30,8 @@ import (
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
 )
+
+var fetchMu sync.Mutex
 
 type fetchResponse struct {
 	// Always set
@@ -103,7 +106,7 @@ func (p *processor) GetSyncRequests(ctx context.Context, reqID int, req v1alpha1
 		// Handle FromQuery => Key
 		if req.Target.Key != nil {
 			if req.Flatten == nil || !*req.Flatten {
-				return nil, fmt.Errorf("requires 'flatten' for 'fromQuery' and 'target.key'")
+				return nil, errors.New("requires 'flatten' for 'fromQuery' and 'target.key'")
 			}
 
 			syncRef := v1alpha1.SecretRef{
@@ -116,9 +119,11 @@ func (p *processor) GetSyncRequests(ctx context.Context, reqID int, req v1alpha1
 				keyName := strcase.ToLowerCamel(ref.GetName())
 				templateData[keyName] = string(resp.Data)
 			}
+
 			if isTemplateEmpty(req.Template) {
-				return nil, fmt.Errorf("requires 'template' for 'fromQuery' and 'target.key'")
+				return nil, errors.New("requires 'template' for 'fromQuery' and 'target.key'")
 			}
+
 			syncValue, err := getTemplatedValue(req.Template, templateData)
 			if err != nil {
 				return nil, err
@@ -126,16 +131,16 @@ func (p *processor) GetSyncRequests(ctx context.Context, reqID int, req v1alpha1
 
 			return map[v1alpha1.SecretRef]syncRequest{
 				syncRef: {
-					Data:      syncValue,
-					ActionRef: &req,
 					RequestID: reqID,
+					ActionRef: &req,
+					Data:      syncValue,
 				},
 			}, nil
 		}
 
 		// Handle FromQuery => KeyPrefix or empty
 		if req.Flatten != nil && *req.Flatten {
-			return nil, fmt.Errorf("cannot use 'flatten' for 'fromQuery' and 'target.key'")
+			return nil, errors.New("cannot use 'flatten' for 'fromQuery' and 'target.key'")
 		}
 
 		syncMap := make(map[v1alpha1.SecretRef]syncRequest)
@@ -169,8 +174,9 @@ func (p *processor) GetSyncRequests(ctx context.Context, reqID int, req v1alpha1
 		}
 
 		if req.Target.Key == nil {
-			return nil, fmt.Errorf("requires 'target.key' for 'fromSources'")
+			return nil, errors.New("requires 'target.key' for 'fromSources'")
 		}
+
 		syncRef := v1alpha1.SecretRef{
 			Key:     *req.Target.Key,
 			Version: nil,
@@ -180,23 +186,27 @@ func (p *processor) GetSyncRequests(ctx context.Context, reqID int, req v1alpha1
 		for ref, resp := range fetchResps {
 			// For responses originating fromRef
 			source := resp.FromSource
+
 			sourceName := strcase.ToLowerCamel(source.Name)
 			if source.FromRef != nil {
 				// Ensures that .Data.<SOURCE NAME> fromRef is the secret value
 				templateData[sourceName] = string(resp.Data)
 			}
+
 			if source.FromQuery != nil {
 				// ensures that .Data.<SOURCE NAME>.<QUERY KEY> fromQuery is the secret value
 				if templateData[sourceName] == nil {
 					templateData[sourceName] = make(map[string]string)
 				}
-				keyName := strcase.ToLowerCamel(ref.GetName())
-				templateData[sourceName].(map[string]string)[keyName] = string(resp.Data)
+
+				templateData[sourceName].(map[string]string)[strcase.ToLowerCamel(ref.GetName())] = string(resp.Data)
 			}
 		}
+
 		if isTemplateEmpty(req.Template) {
-			return nil, fmt.Errorf("requires 'template' for 'fromSources'")
+			return nil, errors.New("requires 'template' for 'fromSources'")
 		}
+
 		syncValue, err := getTemplatedValue(req.Template, templateData)
 		if err != nil {
 			return nil, err
@@ -204,14 +214,14 @@ func (p *processor) GetSyncRequests(ctx context.Context, reqID int, req v1alpha1
 
 		return map[v1alpha1.SecretRef]syncRequest{
 			syncRef: {
-				Data:      syncValue,
-				ActionRef: &req,
 				RequestID: reqID,
+				ActionRef: &req,
+				Data:      syncValue,
 			},
 		}, nil
 	}
 
-	return nil, fmt.Errorf("no sources specified")
+	return nil, errors.New("no sources specified")
 }
 
 // FetchFromRef fetches v1alpha1.SecretRef data from reference or from internal fetch store.
@@ -226,6 +236,7 @@ func (p *processor) FetchFromRef(ctx context.Context, fromRef v1alpha1.SecretRef
 		if err != nil {
 			return nil, err
 		}
+
 		p.addFetchedSecret(fromRef, data)
 	}
 
@@ -245,9 +256,9 @@ func (p *processor) FetchFromQuery(ctx context.Context, fromQuery v1alpha1.Secre
 	}
 
 	// Fetch queried keys in parallel
-	fetchMu := sync.Mutex{}
 	fetched := make(map[v1alpha1.SecretRef]fetchResponse)
 	fetchGroup, fetchCtx := errgroup.WithContext(ctx)
+
 	for _, ref := range keyRefs {
 		func(ref v1alpha1.SecretRef) {
 			fetchGroup.Go(func() error {
@@ -264,6 +275,7 @@ func (p *processor) FetchFromQuery(ctx context.Context, fromQuery v1alpha1.Secre
 					FromQuery: &fromQuery,
 				}
 				fetchMu.Unlock()
+
 				return nil
 			})
 		}(ref)
@@ -273,20 +285,22 @@ func (p *processor) FetchFromQuery(ctx context.Context, fromQuery v1alpha1.Secre
 	if err = fetchGroup.Wait(); err != nil {
 		return nil, err
 	}
+
 	return fetched, nil
 }
 
 // FetchFromSources fetches v1alpha1.SecretRef data from selectors or from internal fetch store..
 func (p *processor) FetchFromSources(ctx context.Context, fromSources []v1alpha1.SecretSource) (map[v1alpha1.SecretRef]fetchResponse, error) {
 	// Fetch source keys from source or fetch store in parallel
-	fetchMu := sync.Mutex{}
 	fetched := make(map[v1alpha1.SecretRef]fetchResponse)
 	fetchGroup, fetchCtx := errgroup.WithContext(ctx)
+
 	for _, src := range fromSources {
 		func(src v1alpha1.SecretSource) {
 			fetchGroup.Go(func() error {
 				// Fetch
 				kvData := make(map[v1alpha1.SecretRef][]byte)
+
 				switch {
 				case src.FromRef != nil:
 					resp, err := p.FetchFromRef(fetchCtx, *src.FromRef)
@@ -300,12 +314,13 @@ func (p *processor) FetchFromSources(ctx context.Context, fromSources []v1alpha1
 					if err != nil {
 						return err
 					}
+
 					for ref, resp := range respMap {
 						kvData[ref] = resp.Data
 					}
 
 				default:
-					return fmt.Errorf("both ref and query are empty")
+					return errors.New("both ref and query are empty")
 				}
 
 				// Update
@@ -317,15 +332,16 @@ func (p *processor) FetchFromSources(ctx context.Context, fromSources []v1alpha1
 					}
 				}
 				fetchMu.Unlock()
+
 				return nil
 			})
 		}(src)
 	}
 
-	// Return
 	if err := fetchGroup.Wait(); err != nil {
 		return nil, err
 	}
+
 	return fetched, nil
 }
 
@@ -333,6 +349,7 @@ func (p *processor) FetchFromSources(ctx context.Context, fromSources []v1alpha1
 func (p *processor) getFetchedSecret(ref v1alpha1.SecretRef) ([]byte, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+
 	res, ok := p.fetched[ref]
 	return res, ok
 }
@@ -341,6 +358,7 @@ func (p *processor) getFetchedSecret(ref v1alpha1.SecretRef) ([]byte, bool) {
 func (p *processor) addFetchedSecret(ref v1alpha1.SecretRef, value []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	p.fetched[ref] = value
 }
 
@@ -353,32 +371,37 @@ func getTemplatedValue(syncTemplate *v1alpha1.SyncTemplate, templateData interfa
 		if err != nil {
 			return nil, err
 		}
+
 		output := new(bytes.Buffer)
 		if err = templater.Execute(output, struct{ Data interface{} }{Data: templateData}); err != nil {
 			return nil, err
 		}
+
 		return output.Bytes(), nil
 	}
 
 	// Handle Template.Data
 	if len(syncTemplate.Data) > 0 {
 		outputMap := make(map[string]string)
+
 		for key, keyTpl := range syncTemplate.Data {
 			templater, err := templater.Parse(keyTpl)
 			if err != nil {
 				return nil, err
 			}
+
 			output := new(bytes.Buffer)
 			if err = templater.Execute(output, struct{ Data interface{} }{Data: templateData}); err != nil {
 				return nil, err
 			}
+
 			outputMap[key] = output.String()
 		}
 
 		return json.Marshal(outputMap)
 	}
 
-	return nil, fmt.Errorf("cannot apply empty template")
+	return nil, errors.New("cannot apply empty template")
 }
 
 // isTemplateEmpty checks if template is defined.
@@ -387,6 +410,7 @@ func isTemplateEmpty(syncTemplate *v1alpha1.SyncTemplate) bool {
 	if syncTemplate == nil {
 		return true
 	}
+
 	return syncTemplate.RawData == nil && len(syncTemplate.Data) == 0
 }
 

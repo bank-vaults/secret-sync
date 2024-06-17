@@ -15,46 +15,69 @@
 package sync
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+const secretStoreTemplate = `
+secretsStore:
+  local:
+    storePath: %q
+`
 
 // TODO: Expand tests
 
 func TestSync(t *testing.T) {
-	syncCmd := NewSyncCmd()
-	syncCmd.SetArgs([]string{
-		"--source", localStore(t, "testdata"),
-		"--target", localStore(t, filepath.Join(os.TempDir(), "target")),
-		"--sync", "testdata/syncjob.yaml",
-	})
-	err := syncCmd.Execute()
-	assert.Nil(t, err)
+	tests := []struct {
+		name   string
+		source string
+		target string
+		sync   string
+	}{
+		{
+			name:   "Sync from local-store to local-store",
+			source: localStore(t, "testdata"),
+			target: localStore(t, filepath.Join(os.TempDir(), "target")),
+			sync:   "testdata/syncjob.yaml",
+		},
+	}
+
+	for _, tt := range tests {
+		ttp := tt
+		t.Run(ttp.name, func(t *testing.T) {
+			syncCMD := NewSyncCmd(context.Background())
+			syncCMD.SetArgs([]string{
+				"--source", ttp.source,
+				"--target", ttp.target,
+				"--sync", ttp.sync,
+			})
+
+			err := syncCMD.ExecuteContext(syncCMD.Context())
+			require.NoError(t, err, "Unexpected error")
+		})
+	}
 }
 
 func localStore(t *testing.T, dirPath string) string {
 	// Ensure dir exists
 	path, err := filepath.Abs(dirPath)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// Create file
 	tmpFile, err := os.CreateTemp("", "source.*")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = os.Remove(tmpFile.Name())
 	})
 
 	// Write
-	_, err = tmpFile.Write([]byte(fmt.Sprintf(`
-secretsStore:
-  local:
-    storePath: %q
-`, path)))
-	assert.Nil(t, err)
+	_, err = tmpFile.WriteString(fmt.Sprintf(secretStoreTemplate, path))
+	require.NoError(t, err)
 
 	return tmpFile.Name()
 }
