@@ -15,13 +15,17 @@
 package v1alpha1
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"sync"
 )
 
-var stores = map[string]SecretStore{}
-var storeMu = sync.RWMutex{}
+var (
+	stores  = map[string]SecretStore{}
+	storeMu sync.RWMutex
+)
 
 // Register a SecretStore for a given backend. Panics if a given backend is already registered.
 func Register(store SecretStore, backend *SecretStoreSpec) {
@@ -32,11 +36,14 @@ func Register(store SecretStore, backend *SecretStoreSpec) {
 
 	storeMu.Lock()
 	defer storeMu.Unlock()
+
 	if _, exists := stores[storeName]; exists {
 		panic(fmt.Errorf("store backend %s already registered", storeName))
 	}
 
 	stores[storeName] = store
+
+	slog.Info(fmt.Sprintf("registered store backend %s", storeName))
 }
 
 // GetSecretStore returns the SecretStore for given SecretStoreSpec.
@@ -47,9 +54,9 @@ func GetSecretStore(backend *SecretStoreSpec) (SecretStore, error) {
 	}
 
 	storeMu.RLock()
-	store, ok := stores[storeName]
-	storeMu.RUnlock()
+	defer storeMu.RUnlock()
 
+	store, ok := stores[storeName]
 	if !ok {
 		return nil, fmt.Errorf("failed to find registered store backend for %s", storeName)
 	}
@@ -61,21 +68,25 @@ func GetSecretStore(backend *SecretStoreSpec) (SecretStore, error) {
 // SecretStore is invalid/not configured.
 func getSecretStoreName(backend *SecretStoreSpec) (string, error) {
 	if backend == nil {
-		return "", fmt.Errorf("no StoreConfig provided")
+		return "", errors.New("no StoreConfig provided")
 	}
+
 	nonNilKey, nonNilCount := "", 0
 	v := reflect.ValueOf(*backend)
-	for i := 0; i < v.NumField(); i++ {
-		if !v.Field(i).IsNil() {
-			nonNilKey = v.Type().Field(i).Name
+	for num := range v.NumField() {
+		if !v.Field(num).IsNil() {
+			nonNilKey = v.Type().Field(num).Name
 			nonNilCount++
 		}
+
 		if nonNilCount > 1 {
 			break
 		}
 	}
+
 	if nonNilCount != 1 {
 		return "", fmt.Errorf("only one store backend required for StoreConfig, found %d", nonNilCount)
 	}
+
 	return nonNilKey, nil
 }

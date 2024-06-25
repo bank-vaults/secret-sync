@@ -41,11 +41,7 @@
 
               goreleaser
 
-              # golangci-lint
-              # TODO: remove once https://github.com/NixOS/nixpkgs/pull/254878 hits unstable
-              (golangci-lint.override (prev: {
-                buildGoModule = pkgs.buildGo121Module;
-              }))
+              golangci-lint
 
               yamllint
               hadolint

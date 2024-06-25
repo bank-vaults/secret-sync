@@ -31,11 +31,11 @@ type client struct {
 
 func (c *client) GetSecret(_ context.Context, key v1alpha1.SecretRef) ([]byte, error) {
 	// Read file
-	fpath := filepath.Join(c.dir, pathForKey(key))
-	data, err := os.ReadFile(fpath)
+	data, err := os.ReadFile(filepath.Join(c.dir, pathForKey(key)))
 	if err != nil {
 		return nil, v1alpha1.ErrKeyNotFound
 	}
+
 	return data, nil
 }
 
@@ -67,17 +67,20 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 				})
 			}
 		}
+
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list failed to query: %w", err)
 	}
+
 	return result, nil
 }
 
 func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []byte) error {
 	// Create parent dir for file
 	fpath := filepath.Join(c.dir, pathForKey(key))
+
 	parentDir := filepath.Dir(fpath)
 	if err := os.MkdirAll(parentDir, os.ModePerm); err != nil {
 		return fmt.Errorf("set failed to create dir %s: %w", parentDir, err)

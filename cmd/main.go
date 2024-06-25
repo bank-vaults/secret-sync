@@ -30,15 +30,13 @@ import (
 )
 
 func main() {
-	config, err := config.LoadConfig()
-	if err != nil {
-		slog.Error(fmt.Errorf("error loading config: %w", err).Error())
-	}
+	config := config.LoadConfig()
 
 	initLogger(config)
 
-	if err := sync.NewSyncCmd().Execute(); err != nil {
-		slog.Error(fmt.Errorf("error executing command: %w", err).Error())
+	syncCMD := sync.NewSyncCmd(context.Background())
+	if err := syncCMD.ExecuteContext(syncCMD.Context()); err != nil {
+		slog.ErrorContext(syncCMD.Context(), fmt.Errorf("error executing command: %w", err).Error())
 	}
 }
 

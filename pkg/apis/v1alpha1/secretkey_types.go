@@ -37,6 +37,7 @@ func (key *SecretRef) GetPath() []string {
 	if len(parts) == 0 {
 		return nil
 	}
+
 	return parts[:len(parts)-1]
 }
 
@@ -46,14 +47,12 @@ func (key *SecretRef) GetName() string {
 	if len(parts) == 0 {
 		return key.Key
 	}
+
 	return parts[len(parts)-1]
 }
 
 func (key *SecretRef) sanitizedKey() string {
-	clean := key.Key
-	clean = strings.TrimPrefix(clean, "/")
-	clean = strings.TrimSuffix(clean, "/")
-	return clean
+	return strings.TrimSuffix(strings.TrimPrefix(key.Key, "/"), "/")
 }
 
 // SecretQuery defines how to query SecretStore to obtain SecretRef(s).

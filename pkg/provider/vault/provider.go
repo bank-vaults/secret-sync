@@ -16,6 +16,7 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/bank-vaults/vault-sdk/vault"
@@ -26,40 +27,39 @@ import (
 type Provider struct{}
 
 func (p *Provider) NewClient(_ context.Context, backend v1alpha1.SecretStoreSpec) (v1alpha1.StoreClient, error) {
-	vaultCfg := backend.Vault
 	apiClient, err := vault.NewClientWithOptions(
-		vault.ClientURL(vaultCfg.Address),
-		vault.ClientRole(vaultCfg.Role),
-		vault.ClientAuthPath(vaultCfg.AuthPath),
-		vault.ClientTokenPath(vaultCfg.TokenPath),
-		vault.ClientToken(vaultCfg.Token))
+		vault.ClientURL(backend.Vault.Address),
+		vault.ClientRole(backend.Vault.Role),
+		vault.ClientAuthPath(backend.Vault.AuthPath),
+		vault.ClientTokenPath(backend.Vault.TokenPath),
+		vault.ClientToken(backend.Vault.Token))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
 	return &client{
 		apiClient:  apiClient,
-		apiKeyPath: vaultCfg.StorePath,
+		apiKeyPath: backend.Vault.StorePath,
 	}, nil
 }
 
 func (p *Provider) Validate(backend v1alpha1.SecretStoreSpec) error {
-	vaultCfg := backend.Vault
-	if vaultCfg == nil {
-		return fmt.Errorf("empty Vault config")
+	if backend.Vault == nil {
+		return errors.New("empty Vault config")
 	}
-	if vaultCfg.Address == "" {
-		return fmt.Errorf("empty .Vault.Address")
+	if backend.Vault.Address == "" {
+		return errors.New("empty .Vault.Address")
 	}
-	if vaultCfg.StorePath == "" {
-		return fmt.Errorf("empty .Vault.StorePath")
+	if backend.Vault.StorePath == "" {
+		return errors.New("empty .Vault.StorePath")
 	}
-	if vaultCfg.AuthPath == "" {
-		return fmt.Errorf("empty .Vault.AuthPath")
+	if backend.Vault.AuthPath == "" {
+		return errors.New("empty .Vault.AuthPath")
 	}
-	if vaultCfg.Token == "" {
-		return fmt.Errorf("empty .Vault.Token")
+	if backend.Vault.Token == "" {
+		return errors.New("empty .Vault.Token")
 	}
+
 	return nil
 }
 

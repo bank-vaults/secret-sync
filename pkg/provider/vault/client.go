@@ -16,6 +16,7 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -33,11 +34,14 @@ type client struct {
 
 func (c *client) GetSecret(ctx context.Context, key v1alpha1.SecretRef) ([]byte, error) {
 	// Get secret from API
-	path := fmt.Sprintf("%s/data/%s", c.apiKeyPath, pathForKey(key))
-	response, err := c.apiClient.RawClient().Logical().ReadWithContext(ctx, path)
+	response, err := c.apiClient.RawClient().Logical().ReadWithContext(
+		ctx,
+		fmt.Sprintf("%s/data/%s", c.apiKeyPath, pathForKey(key)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("api get request failed: %w", err)
 	}
+
 	if response == nil || response.Data == nil {
 		// TODO: check if this is valid err return
 		return nil, v1alpha1.ErrKeyNotFound
@@ -46,25 +50,24 @@ func (c *client) GetSecret(ctx context.Context, key v1alpha1.SecretRef) ([]byte,
 	// Extract key value data
 	secretData, ok := response.Data["data"]
 	if !ok || secretData == nil {
-		return nil, fmt.Errorf("api get returned empty data")
+		return nil, errors.New("api get returned empty data")
 	}
+
 	data, err := cast.ToStringMapE(secretData)
 	if err != nil {
 		return nil, fmt.Errorf("api get request findind data: %w", err)
 	}
 
 	// Get name
-	keyName := key.GetName()
-	keyData, ok := data[keyName]
+	keyData, ok := data[key.GetName()]
 	if !ok {
-		return nil, fmt.Errorf("could not find %s for in get response", keyName)
+		return nil, fmt.Errorf("could not find %s for in get response", key.GetName())
 	}
-	strValue := keyData.(string)
 
-	return []byte(strValue), nil
+	return []byte(keyData.(string)), nil
 }
 
-func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) ([]v1alpha1.SecretRef, error) {
+func (c *client) ListSecretKeys(ctx context.Context, query v1alpha1.SecretQuery) ([]v1alpha1.SecretRef, error) {
 	// Get relative path to dir
 	queryPath := ""
 	if query.Path != nil {
@@ -72,10 +75,14 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 	}
 
 	// List API request
-	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, queryPath))
+	response, err := c.apiClient.RawClient().Logical().ListWithContext(
+		ctx,
+		fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, queryPath),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("api list request failed: %w", err)
 	}
+
 	if response == nil || response.Data == nil {
 		// TODO: check if this is valid err return
 		return nil, v1alpha1.ErrKeyNotFound
@@ -84,11 +91,12 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 	// Read from response
 	listData, ok := response.Data["keys"]
 	if !ok || listData == nil {
-		return nil, fmt.Errorf("api list returned empty data")
+		return nil, errors.New("api list returned empty data")
 	}
+
 	listSlice, ok := listData.([]interface{})
 	if !ok || listSlice == nil {
-		return nil, fmt.Errorf("api list returned invalid data")
+		return nil, errors.New("api list returned invalid data")
 	}
 
 	// Extract keys from response
@@ -113,14 +121,15 @@ func (c *client) ListSecretKeys(_ context.Context, query v1alpha1.SecretQuery) (
 
 func (c *client) SetSecret(ctx context.Context, key v1alpha1.SecretRef, value []byte) error {
 	// Write secret to API
-	path := fmt.Sprintf("%s/data/%s", c.apiKeyPath, pathForKey(key))
-	data := map[string]interface{}{
-		"data": map[string]interface{}{
-			key.GetName(): string(value),
+	_, err := c.apiClient.RawClient().Logical().WriteWithContext(
+		ctx,
+		fmt.Sprintf("%s/data/%s", c.apiKeyPath, pathForKey(key)),
+		map[string]interface{}{
+			"data": map[string]interface{}{
+				key.GetName(): string(value),
+			},
 		},
-	}
-
-	_, err := c.apiClient.RawClient().Logical().WriteWithContext(ctx, path, data)
+	)
 	if err != nil {
 		return fmt.Errorf("api set request failed: %w", err)
 	}
@@ -132,14 +141,17 @@ func (c *client) SetSecret(ctx context.Context, key v1alpha1.SecretRef, value []
 // Not used since it has high memory footprint and does not handle search.
 // It could (potentially) be useful.
 // DEPRECATED
-func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) { //nolint
+func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.SecretRef, error) { //nolint: unused
 	// List API request
-	response, err := c.apiClient.RawClient().Logical().List(fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path))
+	response, err := c.apiClient.RawClient().Logical().ListWithContext(
+		ctx,
+		fmt.Sprintf("%s/metadata/%s", c.apiKeyPath, path),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("api list request failed: %w", err)
 	}
 	if response == nil || response.Data == nil {
-		return nil, fmt.Errorf("api list request returned empty response")
+		return nil, errors.New("api list request returned empty response")
 	}
 
 	// Read from response
@@ -147,6 +159,7 @@ func (c *client) recursiveList(ctx context.Context, path string) ([]v1alpha1.Sec
 	if !ok || listData == nil {
 		return nil, fmt.Errorf("api list returned empty data for key %s", path)
 	}
+
 	listSlice, ok := listData.([]interface{})
 	if !ok || listSlice == nil {
 		return nil, fmt.Errorf("api list returned invalid data for key %s", path)

@@ -17,6 +17,7 @@ package sync
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -30,7 +31,7 @@ import (
 	"github.com/bank-vaults/secret-sync/pkg/storesync"
 )
 
-func NewSyncCmd() *cobra.Command {
+func NewSyncCmd(ctx context.Context) *cobra.Command {
 	// Create cmd
 	cmd := &syncCmd{}
 	cobraCmd := &cobra.Command{
@@ -38,11 +39,16 @@ func NewSyncCmd() *cobra.Command {
 		Short: "Synchronizes secrets from a source to a target store based on sync strategy.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if err := cmd.init(); err != nil {
-				return err
+				return fmt.Errorf("error initializing sync command: %w", err)
 			}
+
 			return cmd.run(cmd.sync)
 		},
 	}
+	// ctx passed to project components
+	cmd.ctx = ctx
+	// ctx passed to cobra
+	cobraCmd.SetContext(ctx)
 
 	// Register cmd flags
 	cobraCmd.Flags().StringVar(&cmd.flgSrcFile, "source", "", "Source store config file. "+
@@ -62,6 +68,7 @@ func NewSyncCmd() *cobra.Command {
 }
 
 type syncCmd struct {
+	ctx          context.Context
 	flgSrcFile   string
 	flagDstFile  string
 	flagSyncFile string
@@ -73,33 +80,27 @@ type syncCmd struct {
 }
 
 func (cmd *syncCmd) init() error {
-	var err error
-
 	// Init source
-	srcStore, err := loadStore(cmd.flgSrcFile)
+	source, err := initStore(cmd.ctx, cmd.flgSrcFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error initializing source store: %w", err)
 	}
-	cmd.source, err = provider.NewClient(context.Background(), srcStore)
-	if err != nil {
-		return err
-	}
+	cmd.source = source
 
 	// Init target
-	targetStore, err := loadStore(cmd.flagDstFile)
+	target, err := initStore(cmd.ctx, cmd.flagDstFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error initializing target store: %w", err)
 	}
-	cmd.target, err = provider.NewClient(context.Background(), targetStore)
-	if err != nil {
-		return err
-	}
+	cmd.target = target
 
 	// Init sync request by loading from file and overriding from cli
-	cmd.sync, err = loadSyncPlan(cmd.flagSyncFile)
+	sync, err := loadSyncPlan(cmd.flagSyncFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error loading sync plan: %w", err)
 	}
+	cmd.sync = sync
+
 	if cmd.flagSchedule != "" {
 		cmd.sync.Schedule = cmd.flagSchedule
 	}
@@ -109,12 +110,13 @@ func (cmd *syncCmd) init() error {
 
 func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 	// Run once
-	if syncReq.GetSchedule() == nil {
-		resp, err := storesync.Sync(context.Background(), cmd.source, cmd.target, syncReq.Sync)
+	if syncReq.GetSchedule(cmd.ctx) == nil {
+		resp, err := storesync.Sync(cmd.ctx, cmd.source, cmd.target, syncReq.Sync)
 		if err != nil {
 			return err
 		}
-		slog.Info(resp.Status)
+		slog.InfoContext(cmd.ctx, resp.Status)
+
 		return nil
 	}
 
@@ -124,22 +126,62 @@ func (cmd *syncCmd) run(syncReq *v1alpha1.SyncJob) error {
 		return err
 	}
 	defer cronTicker.Stop()
+
 	cancel := make(chan os.Signal, 1)
 	signal.Notify(cancel, os.Interrupt)
 	for {
 		select {
 		case <-cronTicker.C:
-			slog.Info("Handling a new sync request...")
-			resp, err := storesync.Sync(context.Background(), cmd.source, cmd.target, syncReq.Sync)
+			slog.InfoContext(cmd.ctx, "Handling a new sync request...")
+
+			resp, err := storesync.Sync(cmd.ctx, cmd.source, cmd.target, syncReq.Sync)
 			if err != nil {
 				return err
 			}
-			slog.Info(resp.Status)
+			slog.InfoContext(cmd.ctx, resp.Status)
 
 		case <-cancel:
 			return nil
 		}
 	}
+}
+
+func initStore(ctx context.Context, path string) (v1alpha1.StoreClient, error) {
+	store, err := loadStore(path)
+	if err != nil {
+		return nil, fmt.Errorf("error loading store: %w", err)
+	}
+
+	client, err := provider.NewClient(ctx, store)
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %w", err)
+	}
+
+	return client, nil
+}
+
+func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
+	// Load file
+	yamlBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal (convert YAML to JSON)
+	var storeConfig = struct {
+		SecretsStore v1alpha1.SecretStoreSpec `json:"secretsStore"`
+	}{}
+
+	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(jsonBytes, &storeConfig); err != nil {
+		return nil, err
+	}
+
+	return &storeConfig.SecretsStore, nil
 }
 
 func loadSyncPlan(path string) (*v1alpha1.SyncJob, error) {
@@ -155,29 +197,10 @@ func loadSyncPlan(path string) (*v1alpha1.SyncJob, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := json.Unmarshal(jsonBytes, &ruleCfg); err != nil {
 		return nil, err
 	}
+
 	return &ruleCfg, nil
-}
-
-func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
-	// Load file
-	yamlBytes, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal (convert YAML to JSON)
-	var storeConfig = struct {
-		SecretsStore v1alpha1.SecretStoreSpec `json:"secretsStore"`
-	}{}
-	jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(jsonBytes, &storeConfig); err != nil {
-		return nil, err
-	}
-	return &storeConfig.SecretsStore, nil
 }

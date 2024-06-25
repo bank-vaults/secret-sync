@@ -180,6 +180,11 @@ You should also be able to find the secrets at the target store path:
 
 ```bash
 cat /tmp/example/local-store/app-access-config
+```
+
+Output:
+
+```json
 {"appID":"12345","hostname":"very-secret-hostname","password":"very-secret-password","username":"very-secret-username"}
 ```
 

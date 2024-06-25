@@ -15,6 +15,7 @@
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -44,12 +45,13 @@ type SyncJob struct {
 	Sync []SyncAction `json:"sync,omitempty"`
 }
 
-func (spec *SyncJob) GetSchedule() *string {
+func (spec *SyncJob) GetSchedule(ctx context.Context) *string {
 	if spec.Schedule == "" {
 		return nil
 	}
+
 	if _, err := cron.Parse(spec.Schedule); err != nil {
-		slog.Error(fmt.Errorf("skipping Schedule due to parse error: %w", err).Error())
+		slog.ErrorContext(ctx, fmt.Errorf("skipping Schedule due to parse error: %w", err).Error())
 		return nil
 	}
 
@@ -60,6 +62,7 @@ func (spec *SyncJob) GetAuditLogPath() string {
 	if spec.AuditLogPath == "" {
 		return DefaultSyncJobAuditLogPath
 	}
+
 	return spec.AuditLogPath
 }
 
