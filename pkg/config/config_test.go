@@ -50,8 +50,7 @@ func TestConfig(t *testing.T) {
 			}
 			defer os.Clearenv()
 
-			config := LoadConfig()
-			assert.Equal(t, ttp.wantConfig, config, "Unexpected config")
+			assert.Equal(t, ttp.wantConfig, LoadConfig(), "Unexpected config")
 		})
 	}
 }

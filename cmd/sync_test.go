@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sync
+package cmd
 
 import (
 	"context"
@@ -31,7 +31,6 @@ secretsStore:
 `
 
 // TODO: Expand tests
-
 func TestSync(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -50,14 +49,13 @@ func TestSync(t *testing.T) {
 	for _, tt := range tests {
 		ttp := tt
 		t.Run(ttp.name, func(t *testing.T) {
-			syncCMD := NewSyncCmd(context.Background())
-			syncCMD.SetArgs([]string{
+			syncCmd.SetArgs([]string{
 				"--source", ttp.source,
 				"--target", ttp.target,
 				"--sync", ttp.sync,
 			})
 
-			err := syncCMD.ExecuteContext(syncCMD.Context())
+			err := syncCmd.ExecuteContext(context.Background())
 			require.NoError(t, err, "Unexpected error")
 		})
 	}

@@ -17,7 +17,6 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"reflect"
 	"sync"
 )
@@ -42,8 +41,6 @@ func Register(store SecretStore, backend *SecretStoreSpec) {
 	}
 
 	stores[storeName] = store
-
-	slog.Info(fmt.Sprintf("registered store backend %s", storeName))
 }
 
 // GetSecretStore returns the SecretStore for given SecretStoreSpec.

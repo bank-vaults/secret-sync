@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package utils
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 	"os"
@@ -25,24 +24,10 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 	slogsyslog "github.com/samber/slog-syslog"
 
-	"github.com/bank-vaults/secret-sync/cmd/sync"
 	"github.com/bank-vaults/secret-sync/pkg/config"
 )
 
-var Version = "v0.1.3"
-
-func main() {
-	config := config.LoadConfig()
-
-	initLogger(config)
-
-	syncCMD := sync.NewSyncCmd(context.Background())
-	if err := syncCMD.ExecuteContext(syncCMD.Context()); err != nil {
-		slog.ErrorContext(syncCMD.Context(), fmt.Errorf("error executing command: %w", err).Error())
-	}
-}
-
-func initLogger(config *config.Config) {
+func InitLogger(config *config.Config) {
 	var level slog.Level
 
 	err := level.UnmarshalText([]byte(config.LogLevel))

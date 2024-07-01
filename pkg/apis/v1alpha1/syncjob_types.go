@@ -26,9 +26,9 @@ import (
 
 var DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
 
-// SyncJob defines overall source-to-target sync strategy.
+// SyncPlan defines overall source-to-target sync strategy.
 // TODO: Add support for auditing.
-type SyncJob struct {
+type SyncPlan struct {
 	// Points to a file where all sync logs should be saved to.
 	// Defaults to DefaultSyncJobAuditLogPath
 	// Optional
@@ -45,7 +45,7 @@ type SyncJob struct {
 	Sync []SyncAction `json:"sync,omitempty"`
 }
 
-func (spec *SyncJob) GetSchedule(ctx context.Context) *string {
+func (spec *SyncPlan) GetSchedule(ctx context.Context) *string {
 	if spec.Schedule == "" {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (spec *SyncJob) GetSchedule(ctx context.Context) *string {
 	return &spec.Schedule
 }
 
-func (spec *SyncJob) GetAuditLogPath() string {
+func (spec *SyncPlan) GetAuditLogPath() string {
 	if spec.AuditLogPath == "" {
 		return DefaultSyncJobAuditLogPath
 	}
