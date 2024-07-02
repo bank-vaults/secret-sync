@@ -15,13 +15,8 @@
 package v1alpha1
 
 import (
-	"context"
-	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
-
-	"github.com/robfig/cron"
 )
 
 var DefaultSyncJobAuditLogPath = filepath.Join(os.TempDir(), "sync-audit.log")
@@ -34,28 +29,9 @@ type SyncPlan struct {
 	// Optional
 	AuditLogPath string `json:"auditLogPath,omitempty"`
 
-	// Used to configure schedule for synchronization.
-	// The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
-	// Defaults to @hourly
-	// Optional
-	Schedule string `json:"schedule,omitempty"`
-
 	// Used to specify the strategy for secrets sync.
 	// Required
 	SyncAction []SyncAction `json:"sync,omitempty"`
-}
-
-func (spec *SyncPlan) GetSchedule(ctx context.Context) *string {
-	if spec.Schedule == "" {
-		return nil
-	}
-
-	if _, err := cron.Parse(spec.Schedule); err != nil {
-		slog.ErrorContext(ctx, fmt.Errorf("skipping Schedule due to parse error: %w", err).Error())
-		return nil
-	}
-
-	return &spec.Schedule
 }
 
 func (spec *SyncPlan) GetAuditLogPath() string {
