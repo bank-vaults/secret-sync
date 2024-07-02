@@ -37,6 +37,13 @@ const (
 	flagSchedule = "schedule"
 )
 
+var syncCmdParams = struct {
+	SourceStorePath string
+	TargetStorePath string
+	SyncJobPath     string
+	Schedule        string
+}{}
+
 type syncJob struct {
 	source   *v1alpha1.StoreClient
 	target   *v1alpha1.StoreClient
@@ -51,14 +58,14 @@ var syncCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(syncCmd)
-	syncCmd.PersistentFlags().StringP(flagSource, "s", "", "Source store config file. ")
+	syncCmd.PersistentFlags().StringVarP(&syncCmdParams.SourceStorePath, flagSource, "s", "", "Source store config file.")
 	_ = syncCmd.MarkPersistentFlagRequired(flagSource)
-	syncCmd.PersistentFlags().StringP(flagTarget, "t", "", "Target store config file. ")
+	syncCmd.PersistentFlags().StringVarP(&syncCmdParams.TargetStorePath, flagTarget, "t", "", "Target store config file. ")
 	_ = syncCmd.MarkPersistentFlagRequired(flagTarget)
-	syncCmd.PersistentFlags().String(flagSyncJob, "", "Sync job config file. ")
+	syncCmd.PersistentFlags().StringVar(&syncCmdParams.SyncJobPath, flagSyncJob, "", "Sync job config file. ")
 	_ = syncCmd.MarkPersistentFlagRequired(flagSyncJob)
 
-	syncCmd.PersistentFlags().String(flagSchedule, "", "Sync periodically using CRON schedule. If not specified, runs only once.")
+	syncCmd.PersistentFlags().StringVar(&syncCmdParams.Schedule, flagSchedule, "", "Sync periodically using CRON schedule. If not specified, runs only once.")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -74,6 +81,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to sync secrets: %w", err)
 		}
 		slog.InfoContext(cmd.Root().Context(), resp.Status)
+
 		return nil
 	}
 
@@ -105,12 +113,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 func prepareSync(cmd *cobra.Command, _ []string) (*syncJob, error) {
 	// Init source
-	source, err := cmd.Flags().GetString(flagSource)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get source flag: %w", err)
-	}
-
-	sourceStore, err := loadStore(source)
+	sourceStore, err := loadStore(syncCmdParams.SourceStorePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load source store: %w", err)
 	}
@@ -121,12 +124,7 @@ func prepareSync(cmd *cobra.Command, _ []string) (*syncJob, error) {
 	}
 
 	// Init target
-	target, err := cmd.Flags().GetString(flagTarget)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get target flag: %w", err)
-	}
-
-	targetStore, err := loadStore(target)
+	targetStore, err := loadStore(syncCmdParams.TargetStorePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load target store: %w", err)
 	}
@@ -137,20 +135,12 @@ func prepareSync(cmd *cobra.Command, _ []string) (*syncJob, error) {
 	}
 
 	// Init sync request by loading from file and overriding from cli
-	sync, err := cmd.Flags().GetString(flagSyncJob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sync flag: %w", err)
-	}
-
-	syncPlan, err := loadSyncPlan(sync)
+	syncPlan, err := loadSyncPlan(syncCmdParams.SyncJobPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sync plan: %w", err)
 	}
 
-	schedule, _ := cmd.Flags().GetString(flagSchedule)
-	if schedule != "" {
-		syncPlan.Schedule = schedule
-	}
+	syncPlan.Schedule = syncCmdParams.Schedule
 
 	return &syncJob{
 		source:   &sourceProvider,
