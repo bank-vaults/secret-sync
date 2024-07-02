@@ -29,6 +29,8 @@ import (
 	"github.com/bank-vaults/secret-sync/pkg/config"
 )
 
+var Version = "v0.1.3"
+
 func main() {
 	config := config.LoadConfig()
 
