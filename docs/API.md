@@ -298,7 +298,7 @@ It requires three things:
 
 - Path to _source store_ config file via `--source` flag
 - Path to _target store_ config file via `--target` flag
-- Path to _sync plan_ config file via `--plan` flag
+- Path to _sync plan_ config file via `--syncjob` flag
 
 Note that only YAML configuration files are supported.
 You can also provide optional params for CRON schedule to periodically sync secrets via `--schedule` flag.
