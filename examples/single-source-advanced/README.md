@@ -135,10 +135,10 @@ Secret synchronization is performed using the CLI by executing the sync plan bet
 To synchronize database secrets from our local to Vault secret store, run:
 
 ```bash
-secret-sync \
+secret-sync sync \
 --source "/tmp/example/local-store.yml" \
 --target "/tmp/example/vault-store.yml" \
---sync "/tmp/example/db-secrets-sync.yml"
+--syncjob "/tmp/example/db-secrets-sync.yml"
 ```
 
 If successful, your output should contain something like:
@@ -163,10 +163,10 @@ docker exec -it secret-sync-vault-1 vault kv get -mount="secret" "db-host"
 To synchronize application access secret from Vault to our local secret store, run:
 
 ```bash
-secret-sync \
+secret-sync sync \
 --target "/tmp/example/local-store.yml" \
 --source "/tmp/example/vault-store.yml" \
---sync "/tmp/example/app-access-config-sync.yml"
+--syncjob "/tmp/example/app-access-config-sync.yml"
 ```
 
 If successful, besides logs:
