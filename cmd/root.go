@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cmd
 
 import (
 	"context"
@@ -24,22 +24,32 @@ import (
 
 	slogmulti "github.com/samber/slog-multi"
 	slogsyslog "github.com/samber/slog-syslog"
+	"github.com/spf13/cobra"
 
-	"github.com/bank-vaults/secret-sync/cmd/sync"
 	"github.com/bank-vaults/secret-sync/pkg/config"
 )
 
-var Version = "v0.1.3"
+var rootCmd = &cobra.Command{
+	Use: "secret-sync",
+	Long: `Secret Sync exposes a generic way to interact with external secret storage systems
+like HashiCorp Vault and provides a set of API models
+to interact and orchestrate the synchronization of secrets between them.`,
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
+}
 
-func main() {
-	config := config.LoadConfig()
-
-	initLogger(config)
-
-	syncCMD := sync.NewSyncCmd(context.Background())
-	if err := syncCMD.ExecuteContext(syncCMD.Context()); err != nil {
-		slog.ErrorContext(syncCMD.Context(), fmt.Errorf("error executing command: %w", err).Error())
+func Execute() {
+	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
+		slog.ErrorContext(rootCmd.Context(), fmt.Sprintf("failed to execute command: %v", err))
+		os.Exit(1)
 	}
+}
+
+func init() {
+	cobra.OnInitialize(func() {
+		initLogger(config.LoadConfig())
+	})
 }
 
 func initLogger(config *config.Config) {
