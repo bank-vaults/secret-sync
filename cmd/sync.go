@@ -19,10 +19,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
 
 	"github.com/ghodss/yaml"
-	"github.com/krayzpipes/cronticker/cronticker"
 	"github.com/spf13/cobra"
 
 	"github.com/bank-vaults/secret-sync/pkg/apis/v1alpha1"
@@ -31,17 +29,15 @@ import (
 )
 
 const (
-	flagSource   = "source"
-	flagTarget   = "target"
-	flagSyncJob  = "syncjob"
-	flagSchedule = "schedule"
+	flagSource  = "source"
+	flagTarget  = "target"
+	flagSyncJob = "syncjob"
 )
 
 var syncCmdParams = struct {
 	SourceStorePath string
 	TargetStorePath string
 	SyncJobPath     string
-	Schedule        string
 }{}
 
 type syncJob struct {
@@ -64,8 +60,6 @@ func init() {
 	_ = syncCmd.MarkPersistentFlagRequired(flagTarget)
 	syncCmd.PersistentFlags().StringVar(&syncCmdParams.SyncJobPath, flagSyncJob, "", "Sync job config file. ")
 	_ = syncCmd.MarkPersistentFlagRequired(flagSyncJob)
-
-	syncCmd.PersistentFlags().StringVar(&syncCmdParams.Schedule, flagSchedule, "", "Sync periodically using CRON schedule. If not specified, runs only once.")
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -74,41 +68,13 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to prepare sync job: %w", err)
 	}
 
-	// Run once
-	if syncJob.syncPlan.GetSchedule(cmd.Root().Context()) == nil {
-		resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.syncPlan.SyncAction)
-		if err != nil {
-			return fmt.Errorf("failed to sync secrets: %w", err)
-		}
-		slog.InfoContext(cmd.Root().Context(), resp.Status)
-
-		return nil
-	}
-
-	// Run on schedule
-	cronTicker, err := cronticker.NewTicker(syncJob.syncPlan.Schedule)
+	resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.syncPlan.SyncAction)
 	if err != nil {
-		return fmt.Errorf("failed to create CRON ticker: %w", err)
+		return fmt.Errorf("failed to sync secrets: %w", err)
 	}
-	defer cronTicker.Stop()
+	slog.InfoContext(cmd.Root().Context(), resp.Status)
 
-	cancel := make(chan os.Signal, 1)
-	signal.Notify(cancel, os.Interrupt)
-	for {
-		select {
-		case <-cronTicker.C:
-			slog.InfoContext(cmd.Root().Context(), "Handling a new sync request...")
-
-			resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.syncPlan.SyncAction)
-			if err != nil {
-				return err
-			}
-			slog.InfoContext(cmd.Root().Context(), resp.Status)
-
-		case <-cancel:
-			return nil
-		}
-	}
+	return nil
 }
 
 func prepareSync(cmd *cobra.Command, _ []string) (*syncJob, error) {
@@ -139,8 +105,6 @@ func prepareSync(cmd *cobra.Command, _ []string) (*syncJob, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sync plan: %w", err)
 	}
-
-	syncPlan.Schedule = syncCmdParams.Schedule
 
 	return &syncJob{
 		source:   &sourceProvider,
