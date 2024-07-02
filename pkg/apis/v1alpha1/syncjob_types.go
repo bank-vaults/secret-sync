@@ -42,7 +42,7 @@ type SyncPlan struct {
 
 	// Used to specify the strategy for secrets sync.
 	// Required
-	Sync []SyncAction `json:"sync,omitempty"`
+	SyncAction []SyncAction `json:"sync,omitempty"`
 }
 
 func (spec *SyncPlan) GetSchedule(ctx context.Context) *string {

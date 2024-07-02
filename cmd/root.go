@@ -18,12 +18,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
+	"slices"
 
+	slogmulti "github.com/samber/slog-multi"
+	slogsyslog "github.com/samber/slog-syslog"
 	"github.com/spf13/cobra"
 
 	"github.com/bank-vaults/secret-sync/pkg/config"
-	"github.com/bank-vaults/secret-sync/pkg/utils"
 )
 
 var rootCmd = &cobra.Command{
@@ -45,6 +48,66 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(func() {
-		utils.InitLogger(config.LoadConfig())
+		initLogger(config.LoadConfig())
 	})
+}
+
+func initLogger(config *config.Config) {
+	var level slog.Level
+
+	err := level.UnmarshalText([]byte(config.LogLevel))
+	if err != nil { // Silently fall back to info level
+		level = slog.LevelInfo
+	}
+
+	levelFilter := func(levels ...slog.Level) func(ctx context.Context, r slog.Record) bool {
+		return func(_ context.Context, r slog.Record) bool {
+			return slices.Contains(levels, r.Level)
+		}
+	}
+
+	router := slogmulti.Router()
+
+	if config.JSONLog {
+		// Send logs with level higher than warning to stderr
+		router = router.Add(
+			slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}),
+			levelFilter(slog.LevelWarn, slog.LevelError),
+		)
+
+		// Send info and debug logs to stdout
+		router = router.Add(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+			levelFilter(slog.LevelDebug, slog.LevelInfo),
+		)
+	} else {
+		// Send logs with level higher than warning to stderr
+		router = router.Add(
+			slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}),
+			levelFilter(slog.LevelWarn, slog.LevelError),
+		)
+
+		// Send info and debug logs to stdout
+		router = router.Add(
+			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+			levelFilter(slog.LevelDebug, slog.LevelInfo),
+		)
+	}
+
+	if config.LogServer != "" {
+		writer, err := net.Dial("udp", config.LogServer)
+
+		// We silently ignore syslog connection errors for the lack of a better solution
+		if err == nil {
+			router = router.Add(slogsyslog.Option{Level: slog.LevelInfo, Writer: writer}.NewSyslogHandler())
+		}
+	}
+
+	// TODO: add level filter handler
+	logger := slog.New(router.Handler())
+	logger = logger.With(slog.String("app", "secret-sync"))
+
+	// Set the default logger to the configured logger,
+	// enabling direct usage of the slog package for logging.
+	slog.SetDefault(logger)
 }

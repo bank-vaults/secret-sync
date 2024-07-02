@@ -38,9 +38,9 @@ const (
 )
 
 type syncJob struct {
-	source *v1alpha1.StoreClient
-	target *v1alpha1.StoreClient
-	sync   *v1alpha1.SyncPlan
+	source   *v1alpha1.StoreClient
+	target   *v1alpha1.StoreClient
+	syncPlan *v1alpha1.SyncPlan
 }
 
 var syncCmd = &cobra.Command{
@@ -68,8 +68,8 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Run once
-	if syncJob.sync.GetSchedule(cmd.Root().Context()) == nil {
-		resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.sync.Sync)
+	if syncJob.syncPlan.GetSchedule(cmd.Root().Context()) == nil {
+		resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.syncPlan.SyncAction)
 		if err != nil {
 			return fmt.Errorf("failed to sync secrets: %w", err)
 		}
@@ -78,7 +78,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Run on schedule
-	cronTicker, err := cronticker.NewTicker(syncJob.sync.Schedule)
+	cronTicker, err := cronticker.NewTicker(syncJob.syncPlan.Schedule)
 	if err != nil {
 		return fmt.Errorf("failed to create CRON ticker: %w", err)
 	}
@@ -91,7 +91,7 @@ func run(cmd *cobra.Command, args []string) error {
 		case <-cronTicker.C:
 			slog.InfoContext(cmd.Root().Context(), "Handling a new sync request...")
 
-			resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.sync.Sync)
+			resp, err := storesync.Sync(cmd.Root().Context(), *syncJob.source, *syncJob.target, syncJob.syncPlan.SyncAction)
 			if err != nil {
 				return err
 			}
@@ -153,9 +153,9 @@ func prepareSync(cmd *cobra.Command, _ []string) (*syncJob, error) {
 	}
 
 	return &syncJob{
-		source: &sourceProvider,
-		target: &targetProvider,
-		sync:   syncPlan,
+		source:   &sourceProvider,
+		target:   &targetProvider,
+		syncPlan: syncPlan,
 	}, nil
 }
 
