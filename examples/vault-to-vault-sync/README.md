@@ -108,10 +108,10 @@ Secret synchronization is performed using the CLI by executing the sync plan bet
 To synchronize the database secrets from the first Vault to the second one, run:
 
 ```bash
-secret-sync \
+secret-sync sync \
 --source "/tmp/example/vault-store.yml" \
 --target "/tmp/example/vault-store-2.yml" \
---sync "/tmp/example/db-secrets-sync-from-vault-to-vault.yml"
+--syncjob "/tmp/example/db-secrets-sync-from-vault-to-vault.yml"
 ```
 
 If successful, your output should contain something like:
