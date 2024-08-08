@@ -60,10 +60,6 @@ Each sync action defines a specific mode of operation depending on its specifica
 You can use this as a reference point to create a more complete sync process based on the given requirements.
 
 ```yaml
-# Used to configure the schedule for synchronization. Optional, runs only once if empty.
-# The schedule is in Cron format, see https://en.wikipedia.org/wiki/Cron
-schedule: "@daily"
-
 # Defines sync actions, i.e. how and what will be synced. Requires at least one.
 sync:
   - actionSpec
@@ -301,8 +297,6 @@ It requires three things:
 - Path to _sync plan_ config file via `--syncjob` flag
 
 Note that only YAML configuration files are supported.
-You can also provide optional params for CRON schedule to periodically sync secrets via `--schedule` flag.
-All sync actions are indexed in logs based on their order in the sync plan config file.
 
 You can also use [pkg/storesync](https://pkg.go.dev/github.com/bank-vaults/secret-sync/pkg/storesync) package to run secret synchronization plan natively from Golang.
 This is how the CLI works as well.
