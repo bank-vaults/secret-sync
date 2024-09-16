@@ -87,7 +87,7 @@ func (c *client) SetSecret(_ context.Context, key v1alpha1.SecretRef, value []by
 	}
 
 	// Write file
-	if err := os.WriteFile(fpath, value, 0600); err != nil {
+	if err := os.WriteFile(fpath, value, 0o600); err != nil {
 		return fmt.Errorf("set failed to write file %s: %w", fpath, err)
 	}
 

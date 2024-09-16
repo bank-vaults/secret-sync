@@ -18,10 +18,6 @@ help: ## Display this help
 up: ## Start development environment
 	docker compose -f dev/vault/docker-compose.yml up -d
 
-.PHONY: stop
-stop: ## Stop development environment
-	docker compose -v -f dev/vault/docker-compose.yml stop
-
 .PHONY: down
 down: ## Destroy development environment
 	docker compose -v -f dev/vault/docker-compose.yml down
@@ -33,6 +29,9 @@ build: ## Build binary
 	@mkdir -p build
 	go build -race -o build/
 
+.PHONY: artifacts
+artifacts: container-image binary-snapshot ## Build artifacts
+
 .PHONY: container-image
 container-image: ## Build container image
 	docker build .
@@ -41,14 +40,11 @@ container-image: ## Build container image
 binary-snapshot: ## Build binary snapshot
 	VERSION=v${GORELEASER_VERSION} ${GORELEASER_BIN} release --clean --skip=publish --snapshot
 
-.PHONY: artifacts
-artifacts: container-image binary-snapshot
-artifacts: ## Build artifacts
 
 ##@ Checks
 
 .PHONY: check
-check: lint test ## Run lint checks and tests
+check: test lint ## Run tests and lint checks
 
 .PHONY: test
 test: ## Run tests
@@ -60,15 +56,15 @@ lint: ## Run linters
 
 .PHONY: lint-go
 lint-go:
-	$(GOLANGCI_LINT_BIN) run $(if ${CI},--out-format github-actions,)
+	$(GOLANGCI_LINT_BIN) run $(if ${CI},--out-format colored-line-number,)
 
 .PHONY: lint-docker
 lint-docker:
-	hadolint Dockerfile
+	$(HADOLINT_BIN) Dockerfile
 
 .PHONY: lint-yaml
 lint-yaml:
-	yamllint $(if ${CI},-f github,) --no-warnings .
+	$(YAMLLINT_BIN) $(if ${CI},-f github,) --no-warnings .
 
 .PHONY: fmt
 fmt: ## Format code
@@ -85,15 +81,19 @@ deps: bin/golangci-lint bin/licensei bin/cosign bin/goreleaser
 deps: ## Install dependencies
 
 # Dependency versions
-GOLANGCI_VERSION = 1.59.1
+GOLANGCI_LINT_VERSION = 1.61.0
 LICENSEI_VERSION = 0.9.0
-COSIGN_VERSION = 2.2.4
-GORELEASER_VERSION = 2.0.0
+COSIGN_VERSION = 2.4.0
+GORELEASER_VERSION = 2.2.0
 
 # Dependency binaries
 GOLANGCI_LINT_BIN := golangci-lint
 LICENSEI_BIN := licensei
 GORELEASER_BIN := goreleaser
+
+# TODO: add support for hadolint and yamllint dependencies
+HADOLINT_BIN := hadolint
+YAMLLINT_BIN := yamllint
 
 # If we have "bin" dir, use those binaries instead
 ifneq ($(wildcard ./bin/.),)
@@ -103,7 +103,7 @@ endif
 
 bin/golangci-lint:
 	@mkdir -p bin
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- v${GOLANGCI_VERSION}
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- v${GOLANGCI_LINT_VERSION}
 
 bin/licensei:
 	@mkdir -p bin
