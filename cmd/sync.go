@@ -121,7 +121,7 @@ func loadStore(path string) (*v1alpha1.SecretStoreSpec, error) {
 	}
 
 	// Unmarshal (convert YAML to JSON)
-	var storeConfig = struct {
+	storeConfig := struct {
 		SecretsStore v1alpha1.SecretStoreSpec `json:"secretsStore"`
 	}{}
 

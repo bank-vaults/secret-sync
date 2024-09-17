@@ -20,7 +20,7 @@
           default = {
             languages = {
               go.enable = true;
-              go.package = pkgs.go_1_21;
+              go.package = pkgs.go_1_23;
             };
 
             services = {
@@ -33,7 +33,7 @@
             pre-commit.hooks = {
               nixpkgs-fmt.enable = true;
               yamllint.enable = true;
-              # hadolint.enable = true;
+              hadolint.enable = true;
             };
 
             packages = with pkgs; [
@@ -42,7 +42,6 @@
               goreleaser
 
               golangci-lint
-
               yamllint
               hadolint
             ] ++ [
