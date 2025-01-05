@@ -6,7 +6,7 @@ require (
 	github.com/bank-vaults/vault-sdk v0.10.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/iancoleman/strcase v0.3.0
-	github.com/samber/slog-multi v1.2.4
+	github.com/samber/slog-multi v1.3.3
 	github.com/samber/slog-syslog v1.0.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.8.1
