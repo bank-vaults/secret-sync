@@ -6,7 +6,7 @@ require (
 	github.com/bank-vaults/vault-sdk v0.10.2
 	github.com/ghodss/yaml v1.0.0
 	github.com/iancoleman/strcase v0.3.0
-	github.com/samber/slog-multi v1.3.3
+	github.com/samber/slog-multi v1.4.0
 	github.com/samber/slog-syslog v1.0.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.8.1
@@ -58,7 +58,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/samber/lo v1.47.0 // indirect
+	github.com/samber/lo v1.49.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0 // indirect
