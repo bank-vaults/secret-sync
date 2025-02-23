@@ -9,7 +9,7 @@ require (
 	github.com/samber/slog-multi v1.4.0
 	github.com/samber/slog-syslog v1.0.0
 	github.com/spf13/cast v1.7.1
-	github.com/spf13/cobra v1.9.0
+	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.11.0
 )
