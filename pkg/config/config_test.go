@@ -46,7 +46,9 @@ func TestConfig(t *testing.T) {
 		ttp := tt
 		t.Run(ttp.name, func(t *testing.T) {
 			for envKey, envVal := range ttp.env {
-				os.Setenv(envKey, envVal)
+				if err := os.Setenv(envKey, envVal); err != nil {
+					t.Fatalf("Failed to set environment variable %s: %v", envKey, err)
+				}
 			}
 			defer os.Clearenv()
 
