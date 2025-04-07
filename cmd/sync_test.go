@@ -74,7 +74,7 @@ func localStore(t *testing.T, dirPath string) string {
 	})
 
 	// Write
-	_, err = tmpFile.WriteString(fmt.Sprintf(secretStoreTemplate, path))
+	_, err = fmt.Fprintf(tmpFile, secretStoreTemplate, path)
 	require.NoError(t, err)
 
 	return tmpFile.Name()
