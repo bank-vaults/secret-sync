@@ -1,6 +1,6 @@
 module github.com/bank-vaults/secret-sync
 
-go 1.23.1
+go 1.24.1
 
 require (
 	github.com/bank-vaults/vault-sdk v0.10.2
