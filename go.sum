@@ -138,8 +138,8 @@ github.com/samber/slog-multi v1.5.0 h1:UDRJdsdb0R5vFQFy3l26rpX3rL3FEPJTJ2yKVjoiT
 github.com/samber/slog-multi v1.5.0/go.mod h1:im2Zi3mH/ivSY5XDj6LFcKToRIWPw1OcjSVSdXt+2d0=
 github.com/samber/slog-syslog v1.0.0 h1:4tf8sNv9+qTQ6Fj8+N6U1ZEtUbqbAIzd+q26/NegWFM=
 github.com/samber/slog-syslog v1.0.0/go.mod h1:jjupk+yHPVSuXuGhKleoClYc/HEaC+Ro5X4YYeBrt6g=
-github.com/spf13/cast v1.9.2 h1:SsGfm7M8QOFtEzumm7UZrZdLLquNdzFYfIbEXntcFbE=
-github.com/spf13/cast v1.9.2/go.mod h1:jNfB8QC9IA6ZuY2ZjDp0KtFO2LZZlg4S/7bzP6qqeHo=
+github.com/spf13/cast v1.10.0 h1:h2x0u2shc1QuLHfxi+cTJvs30+ZAHOGRic8uyGTDWxY=
+github.com/spf13/cast v1.10.0/go.mod h1:jNfB8QC9IA6ZuY2ZjDp0KtFO2LZZlg4S/7bzP6qqeHo=
 github.com/spf13/cobra v1.10.1 h1:lJeBwCfmrnXthfAupyUTzJ/J4Nc1RsHC/mSRU2dll/s=
 github.com/spf13/cobra v1.10.1/go.mod h1:7SmJGaTHFVBY0jW4NXGluQoLvhqFQM+6XSKD+P4XaB0=
 github.com/spf13/pflag v1.0.9 h1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=
