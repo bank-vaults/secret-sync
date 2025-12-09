@@ -16,7 +16,7 @@ package main
 
 import "github.com/bank-vaults/secret-sync/cmd"
 
-var Version = "v0.1.3"
+var Version = "v0.2.1"
 
 func main() {
 	cmd.Execute()
