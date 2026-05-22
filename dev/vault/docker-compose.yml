@@ -1,7 +1,7 @@
 services:
   vault-1:
     container_name: secret-sync-vault-1
-    image: hashicorp/vault:1.14.8
+    image: hashicorp/vault:2.0.1
     ports:
       - 127.0.0.1:8200:8200
     environment:
@@ -12,7 +12,7 @@ services:
 
   vault-2:
     container_name: secret-sync-vault-2
-    image: hashicorp/vault:1.14.8
+    image: hashicorp/vault:2.0.1
     ports:
       - 127.0.0.1:8201:8200
     environment:
